@@ -308,6 +308,13 @@ function aggByChannel(orders, lines, orderIdSet){
   return agg;
 }
 
+function gijonLast(arr, getKey){
+  const key = getKey || (x=>x);
+  const idx = arr.findIndex(x => key(x) === 'Franquicia Gijón');
+  if(idx > -1){ const [item] = arr.splice(idx,1); arr.push(item); }
+  return arr;
+}
+
 function computeChannelTotals(orders, lines, from, to){
   const inSet = new Set(orders.filter(o=>inRange(o.date_order, from, to)).map(o=>o.id));
   const chanByOrder = {};
@@ -379,7 +386,7 @@ function renderCanales(){
     const cur = replaceOviedo(computeChannelTotals(orders, lines, curFrom, curTo), oviedoChannelEntry(curFrom, curTo));
     const prev = replaceOviedo(computeChannelTotals(orders, lines, prevFrom, prevTo), oviedoChannelEntry(prevFrom, prevTo));
     const prevByChannel = {}; prev.forEach(p=>{ prevByChannel[p.channel]=p; });
-    const allChannels = [...new Set([...cur.map(c=>c.channel), ...prev.map(c=>c.channel)])];
+    const allChannels = gijonLast([...new Set([...cur.map(c=>c.channel), ...prev.map(c=>c.channel)])]);
 
     const totalCur = cur.reduce((s,c)=>s+c.revenue,0);
     const totalPrev = prev.reduce((s,c)=>s+c.revenue,0);
@@ -437,7 +444,7 @@ function renderCanales(){
   const totalRevenue = totals.reduce((s,c)=>s+c.revenue,0);
   const totalMargin = totals.reduce((s,c)=>s+c.margin,0);
   const totalOrders = totals.reduce((s,c)=>s+(c.orders||0),0);
-  const sortedTotals = totals.sort((a,b)=>b.revenue-a.revenue);
+  const sortedTotals = gijonLast(totals.sort((a,b)=>b.revenue-a.revenue), c=>c.channel);
 
   kpis.innerHTML = `
     <div class="kpi"><div class="kpi-label">Facturación</div><div class="kpi-value">${fmtEUR(totalRevenue)}</div></div>
