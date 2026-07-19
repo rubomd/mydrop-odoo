@@ -55,7 +55,7 @@ function classifyChannel(order) {
 
   if (partnerName.includes('avil')) return 'Franquicia Avilés';
   if (partnerName.includes('gij')) return 'Franquicia Gijón';
-  if (partnerName.includes('cliente_online') || partnerName.includes('cliente online')) return 'Tienda Online';
+  if (partnerName.includes('cliente_online') || partnerName.includes('cliente online') || partnerName.includes('cliente web')) return 'Tienda Online';
   if (teamName === 'Website') return 'Tienda Online';
   if (teamName === 'Point of Sale') return 'Tienda Oviedo';
   return 'B2B';
