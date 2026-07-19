@@ -165,14 +165,25 @@ async function getSalesData() {
 }
 
 async function getDiagnostics() {
-  const [teams, warehouses, posConfigs, orderFields, sampleOrders, partnerTags] = await Promise.all([
+  const [teams, warehouses, posConfigs, orderFields, sampleOrders, partnerTags, onlinePartnerSearch] = await Promise.all([
     odooCall('crm.team', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
     odooCall('stock.warehouse', 'search_read', [[]], { fields: ['id', 'name', 'code'] }).catch(e => ({ error: e.message })),
     odooCall('pos.config', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
     odooCall('ir.model.fields', 'search_read', [[['model', '=', 'sale.order'], ['name', 'like', 'x_']]], { fields: ['name', 'field_description', 'ttype'] }).catch(e => ({ error: e.message })),
     odooCall('sale.order', 'search_read', [[]], { fields: ['name', 'team_id', 'partner_id'], limit: 8, order: 'date_order desc' }).catch(e => ({ error: e.message })),
     odooCall('res.partner.category', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
+    odooCall('res.partner', 'search_read', [[['name', 'ilike', 'online']]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
   ]);
+
+  // Si encontramos algún partner con "online" en el nombre, buscamos sus pedidos directamente
+  let onlinePartnerOrders = [];
+  if (Array.isArray(onlinePartnerSearch) && onlinePartnerSearch.length) {
+    const ids = onlinePartnerSearch.map(p => p.id);
+    onlinePartnerOrders = await odooCall(
+      'sale.order', 'search_read', [[['partner_id', 'in', ids]]],
+      { fields: ['name', 'date_order', 'amount_total', 'partner_id', 'state'], limit: 50, order: 'date_order desc' }
+    ).catch(e => ({ error: e.message }));
+  }
 
   // Para los últimos 20 pedidos, traemos las etiquetas (category_id) del cliente asociado
   let recentOrdersWithTags = [];
@@ -200,7 +211,7 @@ async function getDiagnostics() {
     recentOrdersWithTags = { error: e.message };
   }
 
-  return { teams, warehouses, posConfigs, customFieldsOnOrders: orderFields, sampleOrders, partnerTags, recentOrdersWithTags };
+  return { teams, warehouses, posConfigs, customFieldsOnOrders: orderFields, sampleOrders, partnerTags, recentOrdersWithTags, onlinePartnerSearch, onlinePartnerOrders };
 }
 
 exports.handler = async (event) => {
