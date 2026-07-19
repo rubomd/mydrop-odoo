@@ -114,6 +114,7 @@
 const FN_URL = '/.netlify/functions/odoo-data';
 let currentView = 'stock';
 let salesCache = null;
+let oviedoSheetCache = null;
 let currentPreset = 'mesvsmes';
 let chartInstance = null;
 
@@ -201,6 +202,13 @@ async function fetchType(type){
   return json.data;
 }
 
+async function fetchOviedoSheet(){
+  const res = await fetch('/.netlify/functions/oviedo-sheet');
+  const json = await res.json();
+  if(!res.ok) throw new Error('Hoja de Oviedo: ' + (json.error || 'error desconocido'));
+  return json.data; // [{date:'YYYY-MM-DD', revenue}, ...]
+}
+
 async function load(){
   const content = document.getElementById('content');
   const kpis = document.getElementById('kpis');
@@ -215,6 +223,10 @@ async function load(){
       renderDiag(data);
     } else {
       if(!salesCache) salesCache = await fetchType('sales');
+      if(!oviedoSheetCache){
+        try { oviedoSheetCache = await fetchOviedoSheet(); }
+        catch(e) { oviedoSheetCache = { error: e.message }; }
+      }
       renderCurrentTab();
     }
   }catch(err){
@@ -308,19 +320,45 @@ function computeChannelTotals(orders, lines, from, to){
   return Object.values(agg).map(c=>({...c, margin:c.revenue-c.cost, marginPct: c.revenue? (c.revenue-c.cost)/c.revenue*100:0}));
 }
 
+// La hoja de Oviedo solo tiene granularidad MENSUAL (no diaria), así que se trata aparte.
+function findOviedoMonth(monthIndex){
+  if(!Array.isArray(oviedoSheetCache)) return null;
+  return oviedoSheetCache.find(m=>m.monthIndex===monthIndex) || null;
+}
+function oviedoChannelEntry(monthIndex, unavailableNote){
+  const m = monthIndex!=null ? findOviedoMonth(monthIndex) : null;
+  if(m){
+    const hasEstimate = m.profitEstimateConMercaderia != null;
+    return {
+      channel: 'Tienda Oviedo', orders: null, revenue: m.total,
+      cost: hasEstimate ? (m.total - m.profitEstimateConMercaderia) : 0,
+      margin: hasEstimate ? m.profitEstimateConMercaderia : m.total,
+      marginPct: hasEstimate && m.total ? (m.profitEstimateConMercaderia/m.total*100) : 0,
+      fromSheet: true, estimated: hasEstimate, golvo: m.golvo,
+    };
+  }
+  return { channel:'Tienda Oviedo', orders:null, revenue:0, cost:0, margin:0, marginPct:0, fromSheet:true, unavailable:true, note: unavailableNote || 'Sin datos para este periodo en la hoja de Oviedo.' };
+}
+function replaceOviedo(channelsArr, entry){
+  const idx = channelsArr.findIndex(c=>c.channel==='Tienda Oviedo');
+  if(idx!==-1) channelsArr.splice(idx,1);
+  channelsArr.push(entry);
+  return channelsArr;
+}
+
 function renderCanales(){
   const kpis = document.getElementById('kpis');
   const content = document.getElementById('content');
   const { orders, lines } = salesCache;
   const note = document.getElementById('filterNote');
 
-  const onlineNote = `<div class="infobox">La <strong>Tienda Online</strong> se registra en Odoo a mano bajo el cliente <strong>CLIENTE_ONLINE</strong> — ya está incluida en estos datos.</div>`;
+  const onlineNote = `<div class="infobox">La <strong>Tienda Online</strong> se registra en Odoo a mano bajo el cliente <strong>CLIENTE WEB</strong> — ya está incluida en estos datos.<br>La <strong>Tienda Oviedo</strong> usa la hoja "Admin Mes - MD Oviedo" (Efectivo + Tarjeta + Glovo). Su margen es una <strong>estimación al 50% sobre ventas</strong> (tabla "con mercadería" de la propia hoja), no un cálculo real como en el resto de canales. Solo tiene datos mensuales, no diarios.</div>`;
 
   if(currentPreset === 'mesvsmes'){
     const { curFrom, curTo, prevFrom, prevTo } = getMonthVsMonth();
     note.textContent = `${curFrom.toLocaleDateString('es-ES',{month:'long',year:'numeric'})} vs ${prevFrom.toLocaleDateString('es-ES',{month:'long',year:'numeric'})}`;
-    const cur = computeChannelTotals(orders, lines, curFrom, curTo);
-    const prev = computeChannelTotals(orders, lines, prevFrom, prevTo);
+    const cur = replaceOviedo(computeChannelTotals(orders, lines, curFrom, curTo), oviedoChannelEntry(curFrom.getMonth()));
+    const prev = replaceOviedo(computeChannelTotals(orders, lines, prevFrom, prevTo), oviedoChannelEntry(prevFrom.getMonth()));
     const prevByChannel = {}; prev.forEach(p=>{ prevByChannel[p.channel]=p; });
     const allChannels = [...new Set([...cur.map(c=>c.channel), ...prev.map(c=>c.channel)])];
 
@@ -342,7 +380,10 @@ function renderCanales(){
         const c = cur.find(x=>x.channel===ch) || {revenue:0,margin:0,marginPct:0};
         const p = prevByChannel[ch] || {revenue:0};
         const pct = p.revenue? ((c.revenue-p.revenue)/p.revenue*100) : (c.revenue>0?100:0);
-        return `<tr><td>${ch}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(p.revenue)}</td>
+        if(c.unavailable){
+          return `<tr><td>${ch}</td><td colspan="5" style="color:var(--muted);">${c.note}</td></tr>`;
+        }
+        return `<tr><td>${ch}${c.estimated?' <span class="badge muted">margen est.</span>':''}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(p.revenue)}</td>
           <td class="${pct>=0?'up':'down'}">${pct>=0?'▲':'▼'} ${fmtPct(Math.abs(pct))}</td>
           <td class="pos">${fmtEUR(c.margin)}</td><td>${fmtPct(c.marginPct)}</td></tr>`;
       }).join('')}</tbody></table>`;
@@ -370,10 +411,13 @@ function renderCanales(){
 
   const range = getRange(currentPreset);
   note.textContent = range.label;
-  const totals = computeChannelTotals(orders, lines, range.from, range.to);
+  const oviedoEntry = (currentPreset === 'mes')
+    ? oviedoChannelEntry(new Date().getMonth())
+    : oviedoChannelEntry(null, 'La hoja de Oviedo solo tiene datos mensuales — usa "Este mes" o "Mes vs mes anterior" para verlo.');
+  const totals = replaceOviedo(computeChannelTotals(orders, lines, range.from, range.to), oviedoEntry);
   const totalRevenue = totals.reduce((s,c)=>s+c.revenue,0);
   const totalMargin = totals.reduce((s,c)=>s+c.margin,0);
-  const totalOrders = totals.reduce((s,c)=>s+c.orders,0);
+  const totalOrders = totals.reduce((s,c)=>s+(c.orders||0),0);
   const sortedTotals = totals.sort((a,b)=>b.revenue-a.revenue);
 
   kpis.innerHTML = `
@@ -386,9 +430,14 @@ function renderCanales(){
     <div class="panel-title">Ventas por canal — ${range.label}</div>
     <div style="height:280px; margin-bottom:24px;"><canvas id="chartCanales"></canvas></div>
     <table><thead><tr><th>Canal</th><th>Pedidos</th><th>Facturación</th><th>Coste</th><th>Margen</th><th>Margen %</th></tr></thead>
-    <tbody>${sortedTotals.map(c=>`<tr>
-      <td>${c.channel}</td><td>${c.orders}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(c.cost)}</td>
-      <td class="pos">${fmtEUR(c.margin)}</td><td>${fmtPct(c.marginPct)}</td></tr>`).join('')}</tbody></table>`;
+    <tbody>${sortedTotals.map(c=>{
+      if(c.unavailable){
+        return `<tr><td>${c.channel}</td><td colspan="5" style="color:var(--muted);">${c.note}</td></tr>`;
+      }
+      return `<tr>
+      <td>${c.channel}${c.estimated?' <span class="badge muted">margen est.</span>':''}</td><td>${c.orders!=null?c.orders:'—'}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(c.cost)}</td>
+      <td class="pos">${fmtEUR(c.margin)}</td><td>${fmtPct(c.marginPct)}</td></tr>`;
+    }).join('')}</tbody></table>`;
 
   renderChart('chartCanales', {
     type: 'bar',
