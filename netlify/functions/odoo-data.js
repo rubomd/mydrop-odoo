@@ -165,7 +165,7 @@ async function getSalesData() {
 }
 
 async function getDiagnostics() {
-  const [teams, warehouses, posConfigs, orderFields, sampleOrders, partnerTags, onlinePartnerSearch] = await Promise.all([
+  const [teams, warehouses, posConfigs, orderFields, sampleOrders, partnerTags, onlinePartnerSearch, productCategories] = await Promise.all([
     odooCall('crm.team', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
     odooCall('stock.warehouse', 'search_read', [[]], { fields: ['id', 'name', 'code'] }).catch(e => ({ error: e.message })),
     odooCall('pos.config', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
@@ -173,7 +173,26 @@ async function getDiagnostics() {
     odooCall('sale.order', 'search_read', [[]], { fields: ['name', 'team_id', 'partner_id'], limit: 8, order: 'date_order desc' }).catch(e => ({ error: e.message })),
     odooCall('res.partner.category', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
     odooCall('res.partner', 'search_read', [[['name', 'ilike', 'online']]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
+    odooCall('product.category', 'search_read', [[]], { fields: ['id', 'name', 'parent_id'] }).catch(e => ({ error: e.message })),
   ]);
+
+  // Muestra de productos con stock, con su categoría y tipo, para ver cómo está organizado el catálogo
+  let productsSample = [];
+  try {
+    const quants = await odooCall(
+      'stock.quant', 'search_read', [[['location_id.usage', '=', 'internal'], ['quantity', '!=', 0]]],
+      { fields: ['product_id'], limit: 300 }
+    );
+    const productIds = [...new Set(quants.map(q => q.product_id ? q.product_id[0] : null).filter(Boolean))];
+    if (productIds.length) {
+      productsSample = await odooCall(
+        'product.product', 'read', [productIds],
+        { fields: ['name', 'categ_id', 'type', 'detailed_type', 'default_code'] }
+      );
+    }
+  } catch (e) {
+    productsSample = { error: e.message };
+  }
 
   // Si encontramos algún partner con "online" en el nombre, buscamos sus pedidos directamente
   let onlinePartnerOrders = [];
@@ -211,7 +230,7 @@ async function getDiagnostics() {
     recentOrdersWithTags = { error: e.message };
   }
 
-  return { teams, warehouses, posConfigs, customFieldsOnOrders: orderFields, sampleOrders, partnerTags, recentOrdersWithTags, onlinePartnerSearch, onlinePartnerOrders };
+  return { teams, warehouses, posConfigs, customFieldsOnOrders: orderFields, sampleOrders, partnerTags, recentOrdersWithTags, onlinePartnerSearch, onlinePartnerOrders, productCategories, productsSample };
 }
 
 exports.handler = async (event) => {
