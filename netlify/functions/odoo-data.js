@@ -116,7 +116,7 @@ async function getSalesData() {
     'sale.order',
     'search_read',
     [[['state', 'in', ['sale', 'done']], ['date_order', '>=', since]]],
-    { fields: ['name', 'date_order', 'amount_total', 'state', 'partner_id', 'team_id'], limit: 4000, order: 'date_order desc' }
+    { fields: ['name', 'date_order', 'amount_total', 'amount_untaxed', 'state', 'partner_id', 'team_id'], limit: 4000, order: 'date_order desc' }
   );
 
   const orderIds = orders.map(o => o.id);
@@ -144,7 +144,7 @@ async function getSalesData() {
     id: o.id,
     name: o.name,
     date_order: o.date_order,
-    amount_total: o.amount_total,
+    amount_total: o.amount_untaxed, // SIN IVA — se usa "amount_total" como nombre de campo por compatibilidad con el frontend, pero el valor es la base imponible
     partner: o.partner_id ? o.partner_id[1] : null,
     channel: channelByOrderId[o.id],
   }));
@@ -181,7 +181,7 @@ async function getDiagnostics() {
     const ids = onlinePartnerSearch.map(p => p.id);
     onlinePartnerOrders = await odooCall(
       'sale.order', 'search_read', [[['partner_id', 'in', ids]]],
-      { fields: ['name', 'date_order', 'amount_total', 'partner_id', 'state'], limit: 50, order: 'date_order desc' }
+      { fields: ['name', 'date_order', 'amount_total', 'amount_untaxed', 'partner_id', 'state'], limit: 50, order: 'date_order desc' }
     ).catch(e => ({ error: e.message }));
   }
 
@@ -190,7 +190,7 @@ async function getDiagnostics() {
   try {
     const recent = await odooCall(
       'sale.order', 'search_read', [[['state', 'in', ['sale', 'done']]]],
-      { fields: ['name', 'date_order', 'amount_total', 'partner_id', 'team_id'], limit: 20, order: 'date_order desc' }
+      { fields: ['name', 'date_order', 'amount_total', 'amount_untaxed', 'partner_id', 'team_id'], limit: 20, order: 'date_order desc' }
     );
     const partnerIds = [...new Set(recent.map(o => o.partner_id ? o.partner_id[0] : null).filter(Boolean))];
     let partners = [];
