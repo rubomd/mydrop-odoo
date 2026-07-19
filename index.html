@@ -390,14 +390,17 @@ function renderCanales(){
       <table><thead><tr><th>Canal</th><th>Mes actual</th><th>Mes anterior</th><th>Variación</th><th>Margen actual</th><th>Margen %</th></tr></thead>
       <tbody>${allChannels.map(ch=>{
         const c = cur.find(x=>x.channel===ch) || {revenue:0,margin:0,marginPct:0};
-        const p = prevByChannel[ch] || {revenue:0};
+        const p = prevByChannel[ch] || {revenue:0,margin:0};
         const pct = p.revenue? ((c.revenue-p.revenue)/p.revenue*100) : (c.revenue>0?100:0);
-        if(c.unavailable){
+        if(c.unavailable && p.unavailable){
           return `<tr><td>${ch}</td><td colspan="5" style="color:var(--muted);">${c.note}</td></tr>`;
         }
-        return `<tr><td>${ch}${c.estimated?' <span class="badge muted">margen est.</span>':''}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(p.revenue)}</td>
-          <td class="${pct>=0?'up':'down'}">${pct>=0?'▲':'▼'} ${fmtPct(Math.abs(pct))}</td>
-          <td class="pos">${fmtEUR(c.margin)}</td><td>${fmtPct(c.marginPct)}</td></tr>`;
+        const curLabel = c.unavailable ? `<span class="badge muted" title="${c.note}">sin datos aún</span>` : fmtEUR(c.revenue);
+        const prevLabel = p.unavailable ? `<span class="badge muted" title="${p.note}">sin datos</span>` : fmtEUR(p.revenue);
+        const pctLabel = (c.unavailable || p.unavailable) ? '—' : `<span class="${pct>=0?'up':'down'}">${pct>=0?'▲':'▼'} ${fmtPct(Math.abs(pct))}</span>`;
+        return `<tr><td>${ch}${c.estimated?' <span class="badge muted">margen est.</span>':''}</td><td>${curLabel}</td><td>${prevLabel}</td>
+          <td>${pctLabel}</td>
+          <td class="pos">${c.unavailable?'—':fmtEUR(c.margin)}</td><td>${c.unavailable?'—':fmtPct(c.marginPct)}</td></tr>`;
       }).join('')}</tbody></table>`;
 
     renderChart('chartCanales', {
