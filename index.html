@@ -4,55 +4,84 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MyDrop CBD · Odoo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #14120F; --bg-alt: #1B2019; --panel: #1F251D; --line: #33392F;
-    --sage: #9BB88F; --gold: #C9A24B; --cream: #F2EDE3; --muted: #8C9186; --danger: #D9695A;
+    --bg: #1A1A1A; --bg-alt: #202020; --panel: #242424; --line: #333333;
+    --coral: #F9495E; --lime: #C4F935; --purple: #BB8DFC;
+    --cream: #ECECE9; --muted: #8A8E8A; --light: #CCCECC; --danger: #F9495E;
   }
   *{box-sizing:border-box;}
-  body{ margin:0; background:var(--bg); color:var(--cream); font-family:'Courier New', ui-monospace, monospace; min-height:100vh; }
-  header{ padding:32px 40px 20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px; }
-  .brand{ font-family: Georgia, 'Times New Roman', serif; font-size:28px; letter-spacing:0.5px; }
-  .brand span{ color:var(--sage); }
-  .subtitle{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:2px; margin-top:4px;}
+  body{ margin:0; background:var(--bg); color:var(--cream); font-family:'Inter', ui-sans-serif, sans-serif; min-height:100vh; }
+  header{ padding:28px 40px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px; }
+  .brand{ font-family:'Inter', sans-serif; font-weight:800; font-size:26px; letter-spacing:-0.5px; }
+  .brand span{ color:var(--coral); }
+  .subtitle{ color:var(--muted); font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:2px; margin-top:4px;}
   .tabs{ display:flex; gap:0; flex-wrap:wrap; }
-  .tab{ padding:10px 18px; border:1px solid var(--line); background:transparent; color:var(--muted); cursor:pointer; font-family:inherit; font-size:12px; letter-spacing:1px; text-transform:uppercase; }
-  .tab.active{ color:var(--bg); background:var(--sage); border-color:var(--sage); }
-  main{ padding:32px 40px 60px; max-width:1300px; margin:0 auto; }
-  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:32px; }
-  .kpi{ border:1px solid var(--line); background:var(--panel); padding:18px 20px; position:relative; }
-  .kpi::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:2px; background:var(--gold); }
-  .kpi-label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; }
-  .kpi-value{ font-family:Georgia,serif; font-size:28px; margin-top:6px; color:var(--cream); }
-  .kpi-value.warn{ color:var(--danger); }
-  .kpi-value.good{ color:var(--sage); }
-  .panel-title{ font-size:12px; text-transform:uppercase; letter-spacing:2px; color:var(--sage); margin:36px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--line); }
-  table{ width:100%; border-collapse:collapse; font-size:13px; }
-  th{ text-align:left; padding:10px 12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-size:11px; border-bottom:1px solid var(--line); }
-  td{ padding:10px 12px; border-bottom:1px solid rgba(51,57,47,0.5); }
-  tr:hover td{ background:rgba(155,184,143,0.05); }
-  tr.alert td{ background:rgba(217,105,90,0.08); }
-  .neg{ color:var(--danger); } .pos{ color:var(--sage); }
-  .badge{ display:inline-block; padding:2px 8px; border:1px solid var(--line); font-size:10px; text-transform:uppercase; letter-spacing:1px; border-radius:2px; }
-  .badge.alert{ color:var(--danger); border-color:var(--danger); }
-  .state{ padding:60px 0; text-align:center; color:var(--muted); font-size:13px; }
-  .state.error{ color:var(--danger); }
-  footer{ text-align:center; padding:24px; color:var(--muted); font-size:11px; letter-spacing:1px; }
+  .tab{ padding:9px 16px; border:1px solid var(--line); background:transparent; color:var(--muted); cursor:pointer; font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:1px; text-transform:uppercase; }
+  .tab.active{ color:var(--bg); background:var(--purple); border-color:var(--purple); font-weight:600; }
+
+  .filterbar{ padding:16px 40px; border-bottom:1px solid var(--line); display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:var(--bg-alt); }
+  .fbtn{ padding:7px 14px; border:1px solid var(--line); background:transparent; color:var(--muted); cursor:pointer; font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.5px; }
+  .fbtn.active{ color:var(--bg); background:var(--coral); border-color:var(--coral); font-weight:600; }
+  .fbtn input[type=date]{ background:var(--panel); color:var(--cream); border:1px solid var(--line); font-family:inherit; font-size:11px; padding:4px; }
+  .filter-note{ color:var(--muted); font-family:'IBM Plex Mono', monospace; font-size:11px; margin-left:8px; }
+
+  main{ padding:28px 40px 60px; max-width:1300px; margin:0 auto; }
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:16px; margin-bottom:28px; }
+  .kpi{ border:1px solid var(--line); background:var(--panel); padding:16px 18px; position:relative; }
+  .kpi::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--lime); }
+  .kpi-label{ font-family:'IBM Plex Mono', monospace; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; }
+  .kpi-value{ font-family:'Inter', sans-serif; font-weight:800; font-size:26px; margin-top:6px; color:var(--cream); }
+  .kpi-value.warn{ color:var(--coral); } .kpi-value.good{ color:var(--lime); }
+  .panel-title{ font-family:'IBM Plex Mono', monospace; font-size:12px; text-transform:uppercase; letter-spacing:2px; color:var(--purple); margin:32px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--line); }
+  table{ width:100%; border-collapse:collapse; font-size:13px; font-family:'IBM Plex Mono', monospace; }
+  th{ text-align:left; padding:9px 12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-size:10px; border-bottom:1px solid var(--line); }
+  td{ padding:9px 12px; border-bottom:1px solid rgba(51,51,51,0.5); }
+  tr:hover td{ background:rgba(187,141,252,0.06); }
+  tr.alert td{ background:rgba(249,73,94,0.10); }
+  .neg{ color:var(--coral); } .pos{ color:var(--lime); }
+  .badge{ display:inline-block; padding:2px 8px; border:1px solid var(--line); font-size:10px; text-transform:uppercase; letter-spacing:1px; }
+  .badge.alert{ color:var(--coral); border-color:var(--coral); }
+  .badge.muted{ color:var(--muted); }
+  .up{ color:var(--lime); } .down{ color:var(--coral); }
+  .state{ padding:60px 0; text-align:center; color:var(--muted); font-family:'IBM Plex Mono', monospace; font-size:13px; }
+  .state.error{ color:var(--coral); }
+  .infobox{ border:1px solid var(--line); background:var(--panel); padding:12px 16px; font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--muted); margin-bottom:20px; }
+  footer{ text-align:center; padding:24px; color:var(--muted); font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:1px; }
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <div class="brand">MyDrop <span>CBD</span></div>
-    <div class="subtitle">Panel Odoo · Canales, Stock &amp; Rentabilidad</div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <div style="width:34px; height:34px; background:var(--coral); border-radius:6px; position:relative; overflow:hidden; flex-shrink:0;">
+      <div style="position:absolute; right:-6px; top:50%; width:22px; height:22px; background:var(--bg); border-radius:50%; transform:translateY(-50%);"></div>
+    </div>
+    <div>
+      <div class="brand">MyDrop <span>CBD</span></div>
+      <div class="subtitle">Panel Odoo · Canales, Stock &amp; Rentabilidad</div>
+    </div>
   </div>
   <div class="tabs">
     <button class="tab active" data-view="stock">Stock</button>
     <button class="tab" data-view="canales">Canales</button>
-    <button class="tab" data-view="productos">Productos</button>
+    <button class="tab" data-view="productos">Top Productos</button>
+    <button class="tab" data-view="b2b">Ranking B2B</button>
   </div>
 </header>
+
+<div class="filterbar" id="filterbar" style="display:none;">
+  <button class="fbtn" data-preset="semana">Esta semana (Lun-Dom)</button>
+  <button class="fbtn" data-preset="mes">Este mes</button>
+  <button class="fbtn active" data-preset="mesvsmes">Mes vs mes anterior</button>
+  <button class="fbtn" data-preset="30d">Últimos 30 días</button>
+  <button class="fbtn" data-preset="custom">
+    Personalizado: <input type="date" id="dateFrom"> a <input type="date" id="dateTo">
+  </button>
+  <span class="filter-note" id="filterNote"></span>
+</div>
 
 <main>
   <div id="kpis" class="kpis"></div>
@@ -64,19 +93,74 @@
 <script>
 const FN_URL = '/.netlify/functions/odoo-data';
 let currentView = 'stock';
-let salesCache = null; // canales + productos comparten el mismo fetch
+let salesCache = null;
+let currentPreset = 'mesvsmes';
 
 document.querySelectorAll('.tab').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     currentView = btn.dataset.view;
+    document.getElementById('filterbar').style.display = (currentView==='stock') ? 'none' : 'flex';
     load();
   });
 });
 
+document.querySelectorAll('.fbtn[data-preset]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPreset = btn.dataset.preset;
+    renderCurrentTab();
+  });
+});
+document.getElementById('dateFrom').addEventListener('change', ()=>{ currentPreset='custom'; setActivePreset('custom'); renderCurrentTab(); });
+document.getElementById('dateTo').addEventListener('change', ()=>{ currentPreset='custom'; setActivePreset('custom'); renderCurrentTab(); });
+function setActivePreset(p){ document.querySelectorAll('.fbtn').forEach(b=>b.classList.toggle('active', b.dataset.preset===p)); }
+
 function fmtEUR(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n||0); }
 function fmtPct(n){ return (n||0).toFixed(1) + '%'; }
+function isoDate(d){ return d.toISOString().slice(0,10); }
+
+// --- Cálculo de rangos de fecha ---
+function getRange(preset){
+  const now = new Date();
+  if(preset === 'semana'){
+    const day = (now.getDay()+6)%7; // lunes=0
+    const monday = new Date(now); monday.setDate(now.getDate()-day); monday.setHours(0,0,0,0);
+    const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+    return { from: monday, to: sunday, label: 'Esta semana (Lun-Dom)' };
+  }
+  if(preset === 'mes'){
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from: first, to: now, label: 'Este mes' };
+  }
+  if(preset === '30d'){
+    const from = new Date(now); from.setDate(now.getDate()-30);
+    return { from, to: now, label: 'Últimos 30 días' };
+  }
+  if(preset === 'custom'){
+    const f = document.getElementById('dateFrom').value;
+    const t = document.getElementById('dateTo').value;
+    if(!f || !t) return { from: new Date(now.getFullYear(),now.getMonth(),1), to: now, label:'Rango personalizado (define ambas fechas)' };
+    return { from: new Date(f), to: new Date(t+'T23:59:59'), label: `${f} a ${t}` };
+  }
+  // mesvsmes se maneja aparte
+  return null;
+}
+function getMonthVsMonth(){
+  const now = new Date();
+  const curFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+  const curTo = now;
+  const prevFrom = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const prevTo = new Date(now.getFullYear(), now.getMonth(), 0);
+  return { curFrom, curTo, prevFrom, prevTo };
+}
+
+function inRange(dateStr, from, to){
+  const d = new Date(dateStr);
+  return d >= from && d <= to;
+}
 
 async function fetchType(type){
   const res = await fetch(`${FN_URL}?type=${type}`);
@@ -90,140 +174,230 @@ async function load(){
   const kpis = document.getElementById('kpis');
   content.innerHTML = '<div class="state">Cargando datos de Odoo…</div>';
   kpis.innerHTML = '';
-
   try{
     if(currentView === 'stock'){
       const data = await fetchType('stock');
       renderStock(data);
     } else {
       if(!salesCache) salesCache = await fetchType('sales');
-      if(currentView === 'canales') renderCanales(salesCache);
-      else renderProductos(salesCache);
+      renderCurrentTab();
     }
   }catch(err){
-    content.innerHTML = `<div class="state error">⚠ ${err.message}<br><br>
-      Revisa las variables de entorno de Odoo en Netlify, o los logs de la función en Logs &amp; metrics.</div>`;
+    content.innerHTML = `<div class="state error">⚠ ${err.message}<br><br>Revisa las variables de entorno de Odoo en Netlify, o los logs de la función.</div>`;
   }
 }
 
+function renderCurrentTab(){
+  if(!salesCache) return;
+  if(currentView === 'canales') renderCanales();
+  else if(currentView === 'productos') renderProductos();
+  else if(currentView === 'b2b') renderB2B();
+}
+
+// --- STOCK ---
 function renderStock(rows){
   const kpis = document.getElementById('kpis');
   const content = document.getElementById('content');
-
   const alerts = rows.filter(r=>r.alert);
   const totalUnits = rows.reduce((s,r)=>s+(r.quantity||0),0);
   const negativeCount = rows.filter(r=>r.quantity < 0).length;
-
   kpis.innerHTML = `
     <div class="kpi"><div class="kpi-label">Referencias con stock</div><div class="kpi-value">${rows.length}</div></div>
     <div class="kpi"><div class="kpi-label">Unidades totales</div><div class="kpi-value">${totalUnits.toFixed(0)}</div></div>
-    <div class="kpi"><div class="kpi-label">⚠ Bajo stock de seguridad</div><div class="kpi-value ${alerts.length?'warn':'good'}">${alerts.length}</div></div>
-    <div class="kpi"><div class="kpi-label">Stock negativo</div><div class="kpi-value ${negativeCount?'warn':'good'}">${negativeCount}</div></div>
-  `;
-
+    <div class="kpi"><div class="kpi-label">⚠ Bajo stock seguridad</div><div class="kpi-value ${alerts.length?'warn':'good'}">${alerts.length}</div></div>
+    <div class="kpi"><div class="kpi-label">Stock negativo</div><div class="kpi-value ${negativeCount?'warn':'good'}">${negativeCount}</div></div>`;
   const sorted = [...rows].sort((a,b)=> (a.alert===b.alert? a.quantity-b.quantity : (a.alert? -1:1)));
   content.innerHTML = `
-    <div class="panel-title">Detalle de stock por ubicación${!rows.some(r=>r.hasRule) ? ' (sin reglas de reposición configuradas en Odoo — umbral por defecto: 5 uds)' : ''}</div>
-    <table>
-      <thead><tr><th>Producto</th><th>Ubicación</th><th>Cantidad</th><th>Mínimo seguridad</th><th>Estado</th></tr></thead>
-      <tbody>
-        ${sorted.map(r=>`
-          <tr class="${r.alert?'alert':''}">
-            <td>${r.product_id ? r.product_id[1] : '—'}</td>
-            <td>${r.location_id ? r.location_id[1] : '—'}</td>
-            <td class="${r.quantity<0?'neg':''}">${r.quantity}</td>
-            <td>${r.minQty}</td>
-            <td>${r.alert ? '<span class="badge alert">Reponer</span>' : '—'}</td>
-          </tr>`).join('')}
-      </tbody>
-    </table>
-  `;
+    <div class="panel-title">Detalle de stock${!rows.some(r=>r.hasRule) ? ' (sin reglas de reposición en Odoo — umbral por defecto: 5 uds)' : ''}</div>
+    <table><thead><tr><th>Producto</th><th>Ubicación</th><th>Cantidad</th><th>Mínimo seguridad</th><th>Estado</th></tr></thead>
+    <tbody>${sorted.map(r=>`<tr class="${r.alert?'alert':''}">
+      <td>${r.product_id?r.product_id[1]:'—'}</td><td>${r.location_id?r.location_id[1]:'—'}</td>
+      <td class="${r.quantity<0?'neg':''}">${r.quantity}</td><td>${r.minQty}</td>
+      <td>${r.alert?'<span class="badge alert">Reponer</span>':'—'}</td></tr>`).join('')}</tbody></table>`;
 }
 
-function renderCanales(data){
+// --- CANALES ---
+function aggByChannel(orders, lines, orderIdSet){
+  const agg = {};
+  orders.forEach(o=>{
+    if(!orderIdSet.has(o.id)) return;
+    if(!agg[o.channel]) agg[o.channel] = { channel:o.channel, orders:0, revenue:0, cost:0 };
+    agg[o.channel].orders++;
+    agg[o.channel].revenue += o.amount_total||0;
+  });
+  lines.forEach(l=>{
+    if(!orderIdSet.has(l.order_id)) return;
+    const ch = orders.find(o=>o.id===l.order_id);
+    if(!ch) return;
+  });
+  // más eficiente: precomputar mapa order_id -> channel
+  return agg;
+}
+
+function computeChannelTotals(orders, lines, from, to){
+  const inSet = new Set(orders.filter(o=>inRange(o.date_order, from, to)).map(o=>o.id));
+  const chanByOrder = {};
+  orders.forEach(o=>{ chanByOrder[o.id]=o.channel; });
+  const agg = {};
+  orders.forEach(o=>{
+    if(!inSet.has(o.id)) return;
+    if(!agg[o.channel]) agg[o.channel] = { channel:o.channel, orders:0, revenue:0, cost:0 };
+    agg[o.channel].orders++;
+    agg[o.channel].revenue += o.amount_total||0;
+  });
+  lines.forEach(l=>{
+    if(!inSet.has(l.order_id)) return;
+    const ch = chanByOrder[l.order_id];
+    if(!ch || !agg[ch]) return;
+    agg[ch].cost += l.cost||0;
+  });
+  return Object.values(agg).map(c=>({...c, margin:c.revenue-c.cost, marginPct: c.revenue? (c.revenue-c.cost)/c.revenue*100:0}));
+}
+
+function renderCanales(){
   const kpis = document.getElementById('kpis');
   const content = document.getElementById('content');
-  const { channels, orders } = data;
+  const { orders, lines } = salesCache;
+  const note = document.getElementById('filterNote');
 
-  const totalRevenue = channels.reduce((s,c)=>s+c.revenue,0);
-  const totalMargin = channels.reduce((s,c)=>s+c.margin,0);
-  const totalOrders = channels.reduce((s,c)=>s+c.orders,0);
+  const onlineNote = `<div class="infobox">La <strong>Tienda Online</strong> vende por Shopify, no por el módulo web de Odoo — esos datos no están disponibles aquí todavía. Si quieres verlos, hay que conectar también la API de Shopify.</div>`;
+
+  if(currentPreset === 'mesvsmes'){
+    const { curFrom, curTo, prevFrom, prevTo } = getMonthVsMonth();
+    note.textContent = `${curFrom.toLocaleDateString('es-ES',{month:'long',year:'numeric'})} vs ${prevFrom.toLocaleDateString('es-ES',{month:'long',year:'numeric'})}`;
+    const cur = computeChannelTotals(orders, lines, curFrom, curTo);
+    const prev = computeChannelTotals(orders, lines, prevFrom, prevTo);
+    const prevByChannel = {}; prev.forEach(p=>{ prevByChannel[p.channel]=p; });
+    const allChannels = [...new Set([...cur.map(c=>c.channel), ...prev.map(c=>c.channel)])];
+
+    const totalCur = cur.reduce((s,c)=>s+c.revenue,0);
+    const totalPrev = prev.reduce((s,c)=>s+c.revenue,0);
+    const change = totalPrev? ((totalCur-totalPrev)/totalPrev*100) : 0;
+
+    kpis.innerHTML = `
+      <div class="kpi"><div class="kpi-label">Facturación mes actual</div><div class="kpi-value">${fmtEUR(totalCur)}</div></div>
+      <div class="kpi"><div class="kpi-label">Facturación mes anterior</div><div class="kpi-value">${fmtEUR(totalPrev)}</div></div>
+      <div class="kpi"><div class="kpi-label">Variación</div><div class="kpi-value ${change>=0?'good':'warn'}">${change>=0?'+':''}${fmtPct(change)}</div></div>
+      <div class="kpi"><div class="kpi-label">Margen mes actual</div><div class="kpi-value good">${fmtEUR(cur.reduce((s,c)=>s+c.margin,0))}</div></div>`;
+
+    content.innerHTML = onlineNote + `
+      <div class="panel-title">Ventas por canal — mes actual vs mes anterior</div>
+      <table><thead><tr><th>Canal</th><th>Mes actual</th><th>Mes anterior</th><th>Variación</th><th>Margen actual</th><th>Margen %</th></tr></thead>
+      <tbody>${allChannels.map(ch=>{
+        const c = cur.find(x=>x.channel===ch) || {revenue:0,margin:0,marginPct:0};
+        const p = prevByChannel[ch] || {revenue:0};
+        const pct = p.revenue? ((c.revenue-p.revenue)/p.revenue*100) : (c.revenue>0?100:0);
+        return `<tr><td>${ch}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(p.revenue)}</td>
+          <td class="${pct>=0?'up':'down'}">${pct>=0?'▲':'▼'} ${fmtPct(Math.abs(pct))}</td>
+          <td class="pos">${fmtEUR(c.margin)}</td><td>${fmtPct(c.marginPct)}</td></tr>`;
+      }).join('')}</tbody></table>`;
+    return;
+  }
+
+  const range = getRange(currentPreset);
+  note.textContent = range.label;
+  const totals = computeChannelTotals(orders, lines, range.from, range.to);
+  const totalRevenue = totals.reduce((s,c)=>s+c.revenue,0);
+  const totalMargin = totals.reduce((s,c)=>s+c.margin,0);
+  const totalOrders = totals.reduce((s,c)=>s+c.orders,0);
 
   kpis.innerHTML = `
-    <div class="kpi"><div class="kpi-label">Facturación (90 días)</div><div class="kpi-value">${fmtEUR(totalRevenue)}</div></div>
+    <div class="kpi"><div class="kpi-label">Facturación</div><div class="kpi-value">${fmtEUR(totalRevenue)}</div></div>
     <div class="kpi"><div class="kpi-label">Margen bruto</div><div class="kpi-value good">${fmtEUR(totalMargin)}</div></div>
     <div class="kpi"><div class="kpi-label">Margen %</div><div class="kpi-value">${fmtPct(totalRevenue? totalMargin/totalRevenue*100:0)}</div></div>
-    <div class="kpi"><div class="kpi-label">Pedidos</div><div class="kpi-value">${totalOrders}</div></div>
-  `;
+    <div class="kpi"><div class="kpi-label">Pedidos</div><div class="kpi-value">${totalOrders}</div></div>`;
 
-  content.innerHTML = `
-    <div class="panel-title">Rentabilidad por canal</div>
-    <table>
-      <thead><tr><th>Canal</th><th>Pedidos</th><th>Facturación</th><th>Coste</th><th>Margen</th><th>Margen %</th></tr></thead>
-      <tbody>
-        ${channels.map(c=>`
-          <tr>
-            <td>${c.channel}</td>
-            <td>${c.orders}</td>
-            <td>${fmtEUR(c.revenue)}</td>
-            <td>${fmtEUR(c.cost)}</td>
-            <td class="pos">${fmtEUR(c.margin)}</td>
-            <td>${fmtPct(c.marginPct)}</td>
-          </tr>`).join('')}
-      </tbody>
-    </table>
-
-    <div class="panel-title">Últimos pedidos (con canal asignado)</div>
-    <table>
-      <thead><tr><th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Canal</th><th>Importe</th></tr></thead>
-      <tbody>
-        ${orders.slice(0,50).map(o=>`
-          <tr>
-            <td>${o.name}</td>
-            <td>${(o.date_order||'').slice(0,10)}</td>
-            <td>${o.partner_id ? o.partner_id[1] : '—'}</td>
-            <td>${o.channel}</td>
-            <td>${fmtEUR(o.amount_total)}</td>
-          </tr>`).join('')}
-      </tbody>
-    </table>
-  `;
+  content.innerHTML = onlineNote + `
+    <div class="panel-title">Ventas por canal — ${range.label}</div>
+    <table><thead><tr><th>Canal</th><th>Pedidos</th><th>Facturación</th><th>Coste</th><th>Margen</th><th>Margen %</th></tr></thead>
+    <tbody>${totals.sort((a,b)=>b.revenue-a.revenue).map(c=>`<tr>
+      <td>${c.channel}</td><td>${c.orders}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(c.cost)}</td>
+      <td class="pos">${fmtEUR(c.margin)}</td><td>${fmtPct(c.marginPct)}</td></tr>`).join('')}</tbody></table>`;
 }
 
-function renderProductos(data){
+// --- TOP PRODUCTOS ---
+function renderProductos(){
   const kpis = document.getElementById('kpis');
   const content = document.getElementById('content');
-  const { products } = data;
+  const { orders, lines } = salesCache;
+  const note = document.getElementById('filterNote');
 
+  let from, to, label;
+  if(currentPreset === 'mesvsmes'){
+    const { curFrom, curTo } = getMonthVsMonth();
+    from = curFrom; to = curTo; label = 'Este mes';
+  } else {
+    const range = getRange(currentPreset);
+    from = range.from; to = range.to; label = range.label;
+  }
+  note.textContent = label;
+
+  const validOrderIds = new Set(orders.filter(o=>inRange(o.date_order, from, to)).map(o=>o.id));
+  const agg = {};
+  lines.forEach(l=>{
+    if(!validOrderIds.has(l.order_id)) return;
+    if(!agg[l.product]) agg[l.product] = { product:l.product, qty:0, revenue:0, cost:0 };
+    agg[l.product].qty += l.qty;
+    agg[l.product].revenue += l.revenue;
+    agg[l.product].cost += l.cost;
+  });
+  const products = Object.values(agg).map(p=>({...p, margin:p.revenue-p.cost, marginPct:p.revenue?(p.revenue-p.cost)/p.revenue*100:0}))
+    .sort((a,b)=>b.qty-a.qty).slice(0,20);
+
+  const totalQty = products.reduce((s,p)=>s+p.qty,0);
   const totalRevenue = products.reduce((s,p)=>s+p.revenue,0);
-  const totalMargin = products.reduce((s,p)=>s+p.margin,0);
-  const bestMargin = [...products].sort((a,b)=>b.marginPct-a.marginPct)[0];
-  const worstMargin = [...products].filter(p=>p.revenue>0).sort((a,b)=>a.marginPct-b.marginPct)[0];
 
   kpis.innerHTML = `
-    <div class="kpi"><div class="kpi-label">Productos vendidos (90 días)</div><div class="kpi-value">${products.length}</div></div>
-    <div class="kpi"><div class="kpi-label">Margen mejor producto</div><div class="kpi-value good">${bestMargin?fmtPct(bestMargin.marginPct):'—'}</div></div>
-    <div class="kpi"><div class="kpi-label">Margen peor producto</div><div class="kpi-value warn">${worstMargin?fmtPct(worstMargin.marginPct):'—'}</div></div>
-    <div class="kpi"><div class="kpi-label">Margen total</div><div class="kpi-value">${fmtEUR(totalMargin)}</div></div>
-  `;
+    <div class="kpi"><div class="kpi-label">Top 20 · Unidades vendidas</div><div class="kpi-value">${totalQty.toFixed(0)}</div></div>
+    <div class="kpi"><div class="kpi-label">Facturación top 20</div><div class="kpi-value">${fmtEUR(totalRevenue)}</div></div>
+    <div class="kpi"><div class="kpi-label">Margen top 20</div><div class="kpi-value good">${fmtEUR(products.reduce((s,p)=>s+p.margin,0))}</div></div>`;
 
   content.innerHTML = `
-    <div class="panel-title">Rentabilidad por producto (90 días, ordenado por facturación)</div>
-    <table>
-      <thead><tr><th>Producto</th><th>Uds. vendidas</th><th>Facturación</th><th>Coste</th><th>Margen</th><th>Margen %</th></tr></thead>
-      <tbody>
-        ${products.slice(0,100).map(p=>`
-          <tr>
-            <td>${p.product}</td>
-            <td>${p.qty}</td>
-            <td>${fmtEUR(p.revenue)}</td>
-            <td>${fmtEUR(p.cost)}</td>
-            <td class="pos">${fmtEUR(p.margin)}</td>
-            <td class="${p.marginPct<20?'neg':''}">${fmtPct(p.marginPct)}</td>
-          </tr>`).join('')}
-      </tbody>
-    </table>
-  `;
+    <div class="panel-title">Top 20 productos más vendidos — ${label}</div>
+    <table><thead><tr><th>#</th><th>Producto</th><th>Uds.</th><th>Facturación</th><th>Margen</th><th>Margen %</th></tr></thead>
+    <tbody>${products.map((p,i)=>`<tr><td>${i+1}</td><td>${p.product}</td><td>${p.qty}</td>
+      <td>${fmtEUR(p.revenue)}</td><td class="pos">${fmtEUR(p.margin)}</td>
+      <td class="${p.marginPct<20?'neg':''}">${fmtPct(p.marginPct)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// --- RANKING B2B ---
+function renderB2B(){
+  const kpis = document.getElementById('kpis');
+  const content = document.getElementById('content');
+  const { orders } = salesCache;
+  const note = document.getElementById('filterNote');
+
+  let from, to, label;
+  if(currentPreset === 'mesvsmes'){
+    const { curFrom, curTo } = getMonthVsMonth();
+    from = curFrom; to = curTo; label = 'Este mes';
+  } else {
+    const range = getRange(currentPreset);
+    from = range.from; to = range.to; label = range.label;
+  }
+  note.textContent = label;
+
+  const b2bOrders = orders.filter(o=>o.channel==='B2B' && inRange(o.date_order, from, to));
+  const agg = {};
+  b2bOrders.forEach(o=>{
+    const key = o.partner || 'Sin cliente';
+    if(!agg[key]) agg[key] = { partner:key, orders:0, revenue:0 };
+    agg[key].orders++;
+    agg[key].revenue += o.amount_total||0;
+  });
+  const clients = Object.values(agg).sort((a,b)=>b.revenue-a.revenue);
+  const totalRevenue = clients.reduce((s,c)=>s+c.revenue,0);
+
+  kpis.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Clientes B2B activos</div><div class="kpi-value">${clients.length}</div></div>
+    <div class="kpi"><div class="kpi-label">Facturación B2B</div><div class="kpi-value">${fmtEUR(totalRevenue)}</div></div>
+    <div class="kpi"><div class="kpi-label">Ticket medio</div><div class="kpi-value">${fmtEUR(clients.length? totalRevenue/b2bOrders.length:0)}</div></div>`;
+
+  content.innerHTML = `
+    <div class="panel-title">Ranking clientes B2B — ${label}</div>
+    <table><thead><tr><th>#</th><th>Cliente</th><th>Pedidos</th><th>Facturación</th><th>% del total B2B</th></tr></thead>
+    <tbody>${clients.map((c,i)=>`<tr><td>${i+1}</td><td>${c.partner}</td><td>${c.orders}</td>
+      <td>${fmtEUR(c.revenue)}</td><td>${fmtPct(totalRevenue? c.revenue/totalRevenue*100:0)}</td></tr>`).join('')}</tbody></table>`;
 }
 
 load();
