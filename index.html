@@ -273,25 +273,66 @@ function renderCurrentTab(){
 }
 
 // --- STOCK ---
+let stockCache = null;
+let stockFilters = { warehouse: 'todos', category: 'todas', type: 'todos' };
+
 function renderStock(rows){
+  stockCache = rows;
+  renderStockFiltered();
+}
+
+function renderStockFiltered(){
+  const rows = stockCache;
   const kpis = document.getElementById('kpis');
   const content = document.getElementById('content');
-  const alerts = rows.filter(r=>r.alert);
-  const totalUnits = rows.reduce((s,r)=>s+(r.quantity||0),0);
-  const negativeCount = rows.filter(r=>r.quantity < 0).length;
+
+  const warehouses = [...new Set(rows.map(r=>r.warehouse))].sort();
+  const categories = [...new Set(rows.map(r=>r.category))].sort();
+  const types = [...new Set(rows.map(r=>r.productType))].sort();
+
+  const filtered = rows.filter(r =>
+    (stockFilters.warehouse==='todos' || r.warehouse===stockFilters.warehouse) &&
+    (stockFilters.category==='todas' || r.category===stockFilters.category) &&
+    (stockFilters.type==='todos' || r.productType===stockFilters.type)
+  );
+
+  const alerts = filtered.filter(r=>r.alert);
+  const totalUnits = filtered.reduce((s,r)=>s+(r.quantity||0),0);
+  const negativeCount = filtered.filter(r=>r.quantity < 0).length;
+
   kpis.innerHTML = `
-    <div class="kpi"><div class="kpi-label">Referencias con stock</div><div class="kpi-value">${rows.length}</div></div>
+    <div class="kpi"><div class="kpi-label">Referencias con stock</div><div class="kpi-value">${filtered.length}</div></div>
     <div class="kpi"><div class="kpi-label">Unidades totales</div><div class="kpi-value">${totalUnits.toFixed(0)}</div></div>
     <div class="kpi"><div class="kpi-label">⚠ Bajo stock seguridad</div><div class="kpi-value ${alerts.length?'warn':'good'}">${alerts.length}</div></div>
     <div class="kpi"><div class="kpi-label">Stock negativo</div><div class="kpi-value ${negativeCount?'warn':'good'}">${negativeCount}</div></div>`;
-  const sorted = [...rows].sort((a,b)=> (a.alert===b.alert? a.quantity-b.quantity : (a.alert? -1:1)));
+
+  const sorted = [...filtered].sort((a,b)=> (a.alert===b.alert? a.quantity-b.quantity : (a.alert? -1:1)));
+
+  const selectHtml = (id, label, options, current) => `
+    <div>
+      <label style="display:block; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">${label}</label>
+      <select id="${id}" style="background:var(--panel); color:var(--cream); border:1px solid var(--line); font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:6px 10px;">
+        <option value="${label==='Almacén'?'todos':label==='Categoría'?'todas':'todos'}">Todos</option>
+        ${options.map(o=>`<option value="${o}" ${o===current?'selected':''}>${o}</option>`).join('')}
+      </select>
+    </div>`;
+
   content.innerHTML = `
+    <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:24px; padding:16px; border:1px solid var(--line); background:var(--bg-alt);">
+      ${selectHtml('filterWarehouse','Almacén', warehouses, stockFilters.warehouse)}
+      ${selectHtml('filterCategory','Categoría', categories, stockFilters.category)}
+      ${selectHtml('filterType','Tipo', types, stockFilters.type)}
+    </div>
     <div class="panel-title">Detalle de stock${!rows.some(r=>r.hasRule) ? ' (sin reglas de reposición en Odoo — umbral por defecto: 5 uds)' : ''}</div>
-    <table><thead><tr><th>Producto</th><th>Ubicación</th><th>Cantidad</th><th>Mínimo seguridad</th><th>Estado</th></tr></thead>
+    <table><thead><tr><th>Producto</th><th>Categoría</th><th>Tipo</th><th>Almacén</th><th>Cantidad</th><th>Mínimo seguridad</th><th>Estado</th></tr></thead>
     <tbody>${sorted.map(r=>`<tr class="${r.alert?'alert':''}">
-      <td>${r.product_id?r.product_id[1]:'—'}</td><td>${r.location_id?r.location_id[1]:'—'}</td>
+      <td>${r.product_id?r.product_id[1]:'—'}</td><td>${r.category}</td><td>${r.productType}</td><td>${r.warehouse}</td>
       <td class="${r.quantity<0?'neg':''}">${r.quantity}</td><td>${r.minQty}</td>
       <td>${r.alert?'<span class="badge alert">Reponer</span>':'—'}</td></tr>`).join('')}</tbody></table>`;
+
+  document.getElementById('filterWarehouse').addEventListener('change', e=>{ stockFilters.warehouse = e.target.value; renderStockFiltered(); });
+  document.getElementById('filterCategory').addEventListener('change', e=>{ stockFilters.category = e.target.value; renderStockFiltered(); });
+  document.getElementById('filterType').addEventListener('change', e=>{ stockFilters.type = e.target.value; renderStockFiltered(); });
 }
 
 // --- CANALES ---
