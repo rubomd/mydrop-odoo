@@ -55,6 +55,7 @@ function classifyChannel(order) {
 
   if (partnerName.includes('avil')) return 'Franquicia Avilés';
   if (partnerName.includes('gij')) return 'Franquicia Gijón';
+  if (partnerName.includes('cliente_online') || partnerName.includes('cliente online')) return 'Tienda Online';
   if (teamName === 'Website') return 'Tienda Online';
   if (teamName === 'Point of Sale') return 'Tienda Oviedo';
   return 'B2B';
@@ -164,14 +165,42 @@ async function getSalesData() {
 }
 
 async function getDiagnostics() {
-  const [teams, warehouses, posConfigs, orderFields, sampleOrders] = await Promise.all([
+  const [teams, warehouses, posConfigs, orderFields, sampleOrders, partnerTags] = await Promise.all([
     odooCall('crm.team', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
     odooCall('stock.warehouse', 'search_read', [[]], { fields: ['id', 'name', 'code'] }).catch(e => ({ error: e.message })),
     odooCall('pos.config', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
     odooCall('ir.model.fields', 'search_read', [[['model', '=', 'sale.order'], ['name', 'like', 'x_']]], { fields: ['name', 'field_description', 'ttype'] }).catch(e => ({ error: e.message })),
     odooCall('sale.order', 'search_read', [[]], { fields: ['name', 'team_id', 'partner_id'], limit: 8, order: 'date_order desc' }).catch(e => ({ error: e.message })),
+    odooCall('res.partner.category', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
   ]);
-  return { teams, warehouses, posConfigs, customFieldsOnOrders: orderFields, sampleOrders };
+
+  // Para los últimos 20 pedidos, traemos las etiquetas (category_id) del cliente asociado
+  let recentOrdersWithTags = [];
+  try {
+    const recent = await odooCall(
+      'sale.order', 'search_read', [[['state', 'in', ['sale', 'done']]]],
+      { fields: ['name', 'date_order', 'amount_total', 'partner_id', 'team_id'], limit: 20, order: 'date_order desc' }
+    );
+    const partnerIds = [...new Set(recent.map(o => o.partner_id ? o.partner_id[0] : null).filter(Boolean))];
+    let partners = [];
+    if (partnerIds.length) {
+      partners = await odooCall('res.partner', 'read', [partnerIds], { fields: ['name', 'category_id'] });
+    }
+    const partnerById = {};
+    partners.forEach(p => { partnerById[p.id] = p; });
+    recentOrdersWithTags = recent.map(o => ({
+      name: o.name,
+      date_order: o.date_order,
+      amount_total: o.amount_total,
+      team: o.team_id ? o.team_id[1] : null,
+      partner: o.partner_id ? o.partner_id[1] : null,
+      partnerTags: o.partner_id && partnerById[o.partner_id[0]] ? partnerById[o.partner_id[0]].category_id : [],
+    }));
+  } catch (e) {
+    recentOrdersWithTags = { error: e.message };
+  }
+
+  return { teams, warehouses, posConfigs, customFieldsOnOrders: orderFields, sampleOrders, partnerTags, recentOrdersWithTags };
 }
 
 exports.handler = async (event) => {
