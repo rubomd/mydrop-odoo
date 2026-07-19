@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyDrop CBD · Odoo</title>
+<style>
+  :root{
+    --bg: #14120F;
+    --bg-alt: #1B2019;
+    --panel: #1F251D;
+    --line: #33392F;
+    --sage: #9BB88F;
+    --gold: #C9A24B;
+    --cream: #F2EDE3;
+    --muted: #8C9186;
+    --danger: #D9695A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--cream);
+    font-family: 'Courier New', ui-monospace, monospace;
+    min-height:100vh;
+  }
+  header{
+    padding:32px 40px 20px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+  .brand{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size:28px;
+    letter-spacing:0.5px;
+  }
+  .brand span{ color:var(--sage); }
+  .subtitle{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:2px; margin-top:4px;}
+  .tabs{ display:flex; gap:0; }
+  .tab{
+    padding:10px 20px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--muted);
+    cursor:pointer;
+    font-family:inherit;
+    font-size:13px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+  }
+  .tab.active{ color:var(--bg); background:var(--sage); border-color:var(--sage); }
+  .tab:first-child{border-radius:2px 0 0 2px;}
+  .tab:last-child{border-radius:0 2px 2px 0; border-left:none;}
+
+  main{ padding:32px 40px 60px; max-width:1200px; margin:0 auto; }
+
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:32px; }
+  .kpi{
+    border:1px solid var(--line);
+    background:var(--panel);
+    padding:18px 20px;
+    position:relative;
+  }
+  .kpi::before{
+    content:'';
+    position:absolute; left:0; top:0; bottom:0; width:2px;
+    background:var(--gold);
+  }
+  .kpi-label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; }
+  .kpi-value{ font-family:Georgia,serif; font-size:30px; margin-top:6px; color:var(--cream); }
+  .kpi-value.warn{ color:var(--danger); }
+
+  .panel-title{
+    font-size:12px; text-transform:uppercase; letter-spacing:2px; color:var(--sage);
+    margin:36px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--line);
+  }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{
+    text-align:left; padding:10px 12px; color:var(--muted);
+    text-transform:uppercase; letter-spacing:1px; font-size:11px;
+    border-bottom:1px solid var(--line);
+  }
+  td{ padding:10px 12px; border-bottom:1px solid rgba(51,57,47,0.5); }
+  tr:hover td{ background:rgba(155,184,143,0.05); }
+  .neg{ color:var(--danger); }
+  .pos{ color:var(--sage); }
+
+  .state{ padding:60px 0; text-align:center; color:var(--muted); font-size:13px; }
+  .state.error{ color:var(--danger); }
+
+  footer{ text-align:center; padding:24px; color:var(--muted); font-size:11px; letter-spacing:1px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="brand">MyDrop <span>CBD</span></div>
+    <div class="subtitle">Panel Odoo · Stock &amp; Ventas</div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-view="stock">Stock</button>
+    <button class="tab" data-view="sales">Ventas</button>
+  </div>
+</header>
+
+<main>
+  <div id="kpis" class="kpis"></div>
+  <div id="content"></div>
+</main>
+
+<footer>MyDrop CBD · C. Jovellanos 8, Oviedo · datos en vivo desde Odoo</footer>
+
+<script>
+const FN_URL = '/.netlify/functions/odoo-data';
+let currentView = 'stock';
+
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentView = btn.dataset.view;
+    load();
+  });
+});
+
+function fmtEUR(n){
+  return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n||0);
+}
+
+async function load(){
+  const content = document.getElementById('content');
+  const kpis = document.getElementById('kpis');
+  content.innerHTML = '<div class="state">Cargando datos de Odoo…</div>';
+  kpis.innerHTML = '';
+
+  try{
+    const res = await fetch(`${FN_URL}?type=${currentView}`);
+    const json = await res.json();
+    if(!res.ok) throw new Error(json.error || 'Error desconocido');
+
+    if(currentView === 'stock') renderStock(json.data);
+    else renderSales(json.data);
+  }catch(err){
+    content.innerHTML = `<div class="state error">⚠ ${err.message}<br><br>
+      Revisa que las variables de entorno ODOO_URL / ODOO_DB / ODOO_LOGIN / ODOO_PASSWORD
+      estén configuradas en Netlify (Site settings → Environment variables).</div>`;
+  }
+}
+
+function renderStock(rows){
+  const kpis = document.getElementById('kpis');
+  const content = document.getElementById('content');
+
+  const totalUnits = rows.reduce((s,r)=>s+(r.quantity||0),0);
+  const negativeCount = rows.filter(r=>r.quantity < 0).length;
+  const lowStock = rows.filter(r=>r.quantity > 0 && r.quantity <= 5).length;
+
+  kpis.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Referencias con stock</div><div class="kpi-value">${rows.length}</div></div>
+    <div class="kpi"><div class="kpi-label">Unidades totales</div><div class="kpi-value">${totalUnits.toFixed(0)}</div></div>
+    <div class="kpi"><div class="kpi-label">Stock bajo (≤5 uds)</div><div class="kpi-value ${lowStock?'warn':''}">${lowStock}</div></div>
+    <div class="kpi"><div class="kpi-label">Stock negativo</div><div class="kpi-value ${negativeCount?'warn':''}">${negativeCount}</div></div>
+  `;
+
+  const sorted = [...rows].sort((a,b)=>(a.quantity)-(b.quantity));
+  content.innerHTML = `
+    <div class="panel-title">Detalle de stock por ubicación</div>
+    <table>
+      <thead><tr><th>Producto</th><th>Ubicación</th><th>Cantidad</th><th>Reservado</th></tr></thead>
+      <tbody>
+        ${sorted.map(r=>`
+          <tr>
+            <td>${r.product_id ? r.product_id[1] : '—'}</td>
+            <td>${r.location_id ? r.location_id[1] : '—'}</td>
+            <td class="${r.quantity<0?'neg':''}">${r.quantity}</td>
+            <td>${r.reserved_quantity}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderSales(rows){
+  const kpis = document.getElementById('kpis');
+  const content = document.getElementById('content');
+
+  const total = rows.reduce((s,r)=>s+(r.amount_total||0),0);
+  const avg = rows.length ? total/rows.length : 0;
+
+  kpis.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Pedidos (90 días)</div><div class="kpi-value">${rows.length}</div></div>
+    <div class="kpi"><div class="kpi-label">Total facturado</div><div class="kpi-value">${fmtEUR(total)}</div></div>
+    <div class="kpi"><div class="kpi-label">Ticket medio</div><div class="kpi-value">${fmtEUR(avg)}</div></div>
+  `;
+
+  content.innerHTML = `
+    <div class="panel-title">Pedidos recientes</div>
+    <table>
+      <thead><tr><th>Pedido</th><th>Fecha</th><th>Cliente</th><th>Estado</th><th>Importe</th></tr></thead>
+      <tbody>
+        ${rows.map(r=>`
+          <tr>
+            <td>${r.name}</td>
+            <td>${(r.date_order||'').slice(0,10)}</td>
+            <td>${r.partner_id ? r.partner_id[1] : '—'}</td>
+            <td>${r.state}</td>
+            <td class="pos">${fmtEUR(r.amount_total)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+load();
+</script>
+</body>
+</html>
