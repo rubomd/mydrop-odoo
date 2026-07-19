@@ -92,6 +92,21 @@ async function getSales() {
   );
 }
 
+async function getDiagnostics() {
+  const [teams, warehouses, posConfigs, orderFields, sampleOrders] = await Promise.all([
+    odooCall('crm.team', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
+    odooCall('stock.warehouse', 'search_read', [[]], { fields: ['id', 'name', 'code'] }).catch(e => ({ error: e.message })),
+    odooCall('pos.config', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
+    odooCall('ir.model.fields', 'search_read', [[['model', '=', 'sale.order'], ['name', 'like', 'x_']]], { fields: ['name', 'field_description', 'ttype'] }).catch(e => ({ error: e.message })),
+    odooCall('sale.order', 'search_read', [[]], {
+      fields: ['name', 'team_id', 'warehouse_id', 'partner_id', 'tag_ids', 'x_studio_canal'],
+      limit: 8,
+      order: 'date_order desc',
+    }).catch(e => ({ error: e.message })),
+  ]);
+  return { teams, warehouses, posConfigs, customFieldsOnOrders: orderFields, sampleOrders };
+}
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -113,8 +128,9 @@ exports.handler = async (event) => {
     let data;
     if (type === 'stock') data = await getStock();
     else if (type === 'sales') data = await getSales();
+    else if (type === 'diag') data = await getDiagnostics();
     else {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'type debe ser "stock" o "sales"' }) };
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'type debe ser "stock", "sales" o "diag"' }) };
     }
 
     return { statusCode: 200, headers, body: JSON.stringify({ type, data }) };
