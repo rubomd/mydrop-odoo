@@ -187,7 +187,7 @@ async function getDiagnostics() {
     if (productIds.length) {
       productsSample = await odooCall(
         'product.product', 'read', [productIds],
-        { fields: ['name', 'categ_id', 'type', 'detailed_type', 'default_code'] }
+        { fields: ['name', 'categ_id', 'type', 'default_code'] }
       );
     }
   } catch (e) {
