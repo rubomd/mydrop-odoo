@@ -246,6 +246,10 @@ function renderDiag(d){
   kpis.innerHTML = '';
   const pre = (obj) => `<pre style="white-space:pre-wrap; font-size:12px; color:var(--cream); background:var(--panel); padding:16px; border:1px solid var(--line); font-family:'IBM Plex Sans',monospace;">${JSON.stringify(obj, null, 2)}</pre>`;
   content.innerHTML = `
+    <div class="panel-title">Categorías de producto (product.category)</div>
+    ${pre(d.productCategories)}
+    <div class="panel-title">Muestra de productos con stock (categoría, tipo, referencia)</div>
+    ${pre(d.productsSample)}
     <div class="panel-title">Hoja de Oviedo (respuesta cruda de la función)</div>
     ${pre(d.oviedoRaw)}
     <div class="panel-title">Búsqueda de clientes con "online" en el nombre</div>
