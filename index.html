@@ -118,8 +118,7 @@
 <footer>MyDrop CBD · C. Jovellanos 8, Oviedo · datos en vivo desde Odoo</footer>
 
 <script>
-// Pega aquí la URL de tu webhook de Make (Módulo 1 - Custom webhook)
-const FN_URL = 'https://hook.eu1.make.com/PEGA_AQUI_TU_URL_DE_WEBHOOK';
+const FN_URL = '/.netlify/functions/odoo-data';
 let currentView = 'stock';
 
 document.querySelectorAll('.tab').forEach(btn=>{
