@@ -106,15 +106,16 @@ async function getStockData() {
   return rows;
 }
 
-// --- Ventas por canal + rentabilidad por canal y producto ---
+// --- Ventas: devuelve pedidos y líneas en crudo (con canal y coste ya calculados),
+// para que el dashboard pueda filtrar por cualquier rango de fechas sin volver a pedir datos.
 async function getSalesData() {
-  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const orders = await odooCall(
     'sale.order',
     'search_read',
     [[['state', 'in', ['sale', 'done']], ['date_order', '>=', since]]],
-    { fields: ['name', 'date_order', 'amount_total', 'state', 'partner_id', 'team_id'], limit: 1000, order: 'date_order desc' }
+    { fields: ['name', 'date_order', 'amount_total', 'state', 'partner_id', 'team_id'], limit: 4000, order: 'date_order desc' }
   );
 
   const orderIds = orders.map(o => o.id);
@@ -124,7 +125,7 @@ async function getSalesData() {
       'sale.order.line',
       'search_read',
       [[['order_id', 'in', orderIds]]],
-      { fields: ['product_id', 'price_subtotal', 'product_uom_qty', 'order_id'], limit: 8000 }
+      { fields: ['product_id', 'price_subtotal', 'product_uom_qty', 'order_id'], limit: 20000 }
     );
   }
 
@@ -138,46 +139,28 @@ async function getSalesData() {
   const channelByOrderId = {};
   orders.forEach(o => { channelByOrderId[o.id] = classifyChannel(o); });
 
-  // Agregado por canal
-  const channelAgg = {};
-  orders.forEach(o => {
-    const ch = channelByOrderId[o.id];
-    if (!channelAgg[ch]) channelAgg[ch] = { channel: ch, orders: 0, revenue: 0, cost: 0 };
-    channelAgg[ch].orders += 1;
-    channelAgg[ch].revenue += o.amount_total || 0;
-  });
-  lines.forEach(l => {
-    const oid = l.order_id ? l.order_id[0] : null;
-    const ch = channelByOrderId[oid];
-    if (!ch) return;
+  const ordersOut = orders.map(o => ({
+    id: o.id,
+    name: o.name,
+    date_order: o.date_order,
+    amount_total: o.amount_total,
+    partner: o.partner_id ? o.partner_id[1] : null,
+    channel: channelByOrderId[o.id],
+  }));
+
+  const linesOut = lines.map(l => {
     const pid = l.product_id ? l.product_id[0] : null;
-    channelAgg[ch].cost += (costs[pid] || 0) * (l.product_uom_qty || 0);
+    const unitCost = costs[pid] || 0;
+    return {
+      order_id: l.order_id ? l.order_id[0] : null,
+      product: l.product_id ? l.product_id[1] : 'Desconocido',
+      qty: l.product_uom_qty || 0,
+      revenue: l.price_subtotal || 0,
+      cost: unitCost * (l.product_uom_qty || 0),
+    };
   });
-  const channels = Object.values(channelAgg).map(c => ({
-    ...c,
-    margin: c.revenue - c.cost,
-    marginPct: c.revenue ? ((c.revenue - c.cost) / c.revenue) * 100 : 0,
-  })).sort((a, b) => b.revenue - a.revenue);
 
-  // Agregado por producto
-  const productAgg = {};
-  lines.forEach(l => {
-    const pid = l.product_id ? l.product_id[0] : 'unknown';
-    const pname = l.product_id ? l.product_id[1] : 'Desconocido';
-    if (!productAgg[pid]) productAgg[pid] = { product: pname, qty: 0, revenue: 0, cost: 0 };
-    productAgg[pid].qty += l.product_uom_qty || 0;
-    productAgg[pid].revenue += l.price_subtotal || 0;
-    productAgg[pid].cost += (costs[pid] || 0) * (l.product_uom_qty || 0);
-  });
-  const products = Object.values(productAgg).map(p => ({
-    ...p,
-    margin: p.revenue - p.cost,
-    marginPct: p.revenue ? ((p.revenue - p.cost) / p.revenue) * 100 : 0,
-  })).sort((a, b) => b.revenue - a.revenue);
-
-  const ordersOut = orders.map(o => ({ ...o, channel: channelByOrderId[o.id] }));
-
-  return { channels, products, orders: ordersOut };
+  return { orders: ordersOut, lines: linesOut };
 }
 
 async function getDiagnostics() {
