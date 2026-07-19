@@ -36,8 +36,9 @@ exports.handler = async () => {
     const parsed = JSON.parse(jsonStr);
     const rows = parsed.table.rows;
 
-    const months = []; // { month, monthIndex, efectivo, tarjeta, golvo, total, media, profitEstimateConMercaderia }
+    const months = []; // { month, monthIndex, efectivo, tarjeta, golvo, total, totalUntaxed, media }
     const profitByMonth = {};
+    const IVA_RATE = 0.21; // asunción: los importes de caja (Efectivo/Tarjeta/Glovo) llevan IVA incluido, como es habitual en un TPV físico
 
     for (const row of rows) {
       const cells = (row.c || []).map(c => (c ? c.v : null));
@@ -53,7 +54,12 @@ exports.handler = async () => {
       const media = typeof cells[7] === 'number' ? cells[7] : null;
 
       if (total != null) {
-        months.push({ month: label, monthIndex: monthIdx, efectivo, tarjeta, golvo, total, media });
+        months.push({
+          month: label, monthIndex: monthIdx,
+          efectivo, tarjeta, golvo,
+          total, totalUntaxed: total / (1 + IVA_RATE),
+          media,
+        });
       }
 
       // Bloque de beneficio estimado (más abajo en la hoja, misma columna de mes en B) —
@@ -65,7 +71,8 @@ exports.handler = async () => {
     }
 
     months.forEach(m => {
-      m.profitEstimateConMercaderia = profitByMonth[m.month] != null ? profitByMonth[m.month] : null;
+      const raw = profitByMonth[m.month];
+      m.profitEstimateConMercaderia = raw != null ? raw / (1 + IVA_RATE) : null;
     });
 
     return { statusCode: 200, headers, body: JSON.stringify({ data: months }) };
