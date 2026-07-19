@@ -40,33 +40,44 @@ exports.handler = async () => {
     const profitByMonth = {};
     const IVA_RATE = 0.21; // asunción: los importes de caja (Efectivo/Tarjeta/Glovo) llevan IVA incluido, como es habitual en un TPV físico
 
+    // La hoja tiene DOS tablas distintas que reutilizan los mismos nombres de mes en
+    // la columna B: primero la de INGRESOS (fila ~14-23), luego, tras "TOTAL AÑO" /
+    // "MEDIA AÑO", la de BENEFICIO ESTIMADO (fila ~33-44). Hay que trackear en cuál
+    // de las dos estamos para no mezclar columnas de una tabla con la otra.
+    let section = 'ingresos';
+
     for (const row of rows) {
       const cells = (row.c || []).map(c => (c ? c.v : null));
       const label = (cells[1] || '').toString().trim().toUpperCase();
+
+      if (label === 'MEDIA AÑO') { section = 'profit'; continue; }
+      if (label === 'TOTAL AÑO') continue;
+
       const monthIdx = MESES.indexOf(label);
       if (monthIdx === -1) continue;
 
-      // Bloque de ingresos (EFECTIVO/TARJETA/GOLVO/TOTAL/MEDIA) — columnas C..H (índices 2..7)
-      const efectivo = typeof cells[2] === 'number' ? cells[2] : null;
-      const tarjeta = typeof cells[3] === 'number' ? cells[3] : null;
-      const golvo = typeof cells[4] === 'number' ? cells[4] : null;
-      const total = typeof cells[5] === 'number' ? cells[5] : null;
-      const media = typeof cells[7] === 'number' ? cells[7] : null;
-
-      if (total != null) {
-        months.push({
-          month: label, monthIndex: monthIdx,
-          efectivo, tarjeta, golvo,
-          total, totalUntaxed: total / (1 + IVA_RATE),
-          media,
-        });
-      }
-
-      // Bloque de beneficio estimado (más abajo en la hoja, misma columna de mes en B) —
-      // "CON MERCADERIA" TOTAL está en la columna J (índice 9)
-      const conMercaderiaTotal = typeof cells[9] === 'number' ? cells[9] : null;
-      if (conMercaderiaTotal != null) {
-        profitByMonth[label] = conMercaderiaTotal;
+      if (section === 'ingresos') {
+        // Columnas C..H (índices 2..7): EFECTIVO, TARJETA, GOLVO, TOTAL, INCR.VENTA, MEDIA
+        const efectivo = typeof cells[2] === 'number' ? cells[2] : null;
+        const tarjeta = typeof cells[3] === 'number' ? cells[3] : null;
+        const golvo = typeof cells[4] === 'number' ? cells[4] : null;
+        const total = typeof cells[5] === 'number' ? cells[5] : null;
+        const media = typeof cells[7] === 'number' ? cells[7] : null;
+        if (total != null) {
+          months.push({
+            month: label, monthIndex: monthIdx,
+            efectivo, tarjeta, golvo,
+            total, totalUntaxed: total / (1 + IVA_RATE),
+            media,
+          });
+        }
+      } else {
+        // Bloque "beneficio estimado": B=mes, C-F=SIN MERCADERIA (IMPORTE,IVA,RET,TOTAL),
+        // G=hueco, H-K=CON MERCADERIA (IMPORTE,IVA,RET,TOTAL) -> el TOTAL con mercadería está en K (índice 10)
+        const conMercaderiaTotal = typeof cells[10] === 'number' ? cells[10] : null;
+        if (conMercaderiaTotal != null) {
+          profitByMonth[label] = conMercaderiaTotal;
+        }
       }
     }
 
