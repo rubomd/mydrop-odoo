@@ -72,20 +72,32 @@ async function getStockData() {
 
   const productIds = [...new Set(quants.map(q => (q.product_id ? q.product_id[0] : null)).filter(Boolean))];
 
-  let orderpoints = [];
-  if (productIds.length) {
-    orderpoints = await odooCall(
-      'stock.warehouse.orderpoint',
-      'search_read',
-      [[['product_id', 'in', productIds]]],
-      { fields: ['product_id', 'product_min_qty', 'product_max_qty', 'warehouse_id'] }
-    ).catch(() => []);
-  }
+  const [orderpoints, products] = await Promise.all([
+    productIds.length
+      ? odooCall('stock.warehouse.orderpoint', 'search_read', [[['product_id', 'in', productIds]]],
+          { fields: ['product_id', 'product_min_qty', 'product_max_qty', 'warehouse_id'] }).catch(() => [])
+      : [],
+    productIds.length
+      ? odooCall('product.product', 'read', [productIds], { fields: ['categ_id', 'default_code'] }).catch(() => [])
+      : [],
+  ]);
 
   const minByProduct = {};
   orderpoints.forEach(op => {
     if (op.product_id) minByProduct[op.product_id[0]] = op.product_min_qty;
   });
+
+  const productInfoById = {};
+  products.forEach(p => { productInfoById[p.id] = p; });
+
+  // Granel/materia prima: se identifica por el nombre o la referencia, no por un campo de Odoo.
+  function classifyProductType(name, code) {
+    const text = `${name || ''} ${code || ''}`.toLowerCase();
+    if (text.includes('granel') || /\(\s*base\s*\)/.test(text) || text.includes('base-') || code && /^(base|granel)-/i.test(code)) {
+      return 'Granel / Materia prima';
+    }
+    return 'Producto terminado';
+  }
 
   const DEFAULT_MIN = 5; // umbral de seguridad si el producto no tiene regla de reposición configurada en Odoo
 
@@ -93,9 +105,20 @@ async function getStockData() {
     const pid = q.product_id ? q.product_id[0] : null;
     const hasRule = pid != null && minByProduct[pid] != null;
     const minQty = hasRule ? minByProduct[pid] : DEFAULT_MIN;
+    const info = pid != null ? productInfoById[pid] : null;
+    const categName = info && info.categ_id ? info.categ_id[1] : 'Sin categoría';
+    const productName = q.product_id ? q.product_id[1] : '';
+    const code = info ? info.default_code : null;
+    // La ubicación suele venir como "Almacén/Zona..."; nos quedamos con el nombre del almacén (primer tramo)
+    const locationName = q.location_id ? q.location_id[1] : '';
+    const warehouse = locationName.split('/')[0].trim() || 'Sin almacén';
     return {
       product_id: q.product_id,
       location_id: q.location_id,
+      warehouse,
+      category: categName,
+      productType: classifyProductType(productName, code),
+      code,
       quantity: q.quantity,
       reserved_quantity: q.reserved_quantity,
       minQty,
