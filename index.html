@@ -106,6 +106,7 @@
   <div class="tabs">
     <button class="tab active" data-view="stock">Stock</button>
     <button class="tab" data-view="sales">Ventas</button>
+    <button class="tab" data-view="diag">Diagnóstico</button>
   </div>
 </header>
 
@@ -117,7 +118,8 @@
 <footer>MyDrop CBD · C. Jovellanos 8, Oviedo · datos en vivo desde Odoo</footer>
 
 <script>
-const FN_URL = '/.netlify/functions/odoo-data';
+// Pega aquí la URL de tu webhook de Make (Módulo 1 - Custom webhook)
+const FN_URL = 'https://hook.eu1.make.com/PEGA_AQUI_TU_URL_DE_WEBHOOK';
 let currentView = 'stock';
 
 document.querySelectorAll('.tab').forEach(btn=>{
@@ -145,7 +147,8 @@ async function load(){
     if(!res.ok) throw new Error(json.error || 'Error desconocido');
 
     if(currentView === 'stock') renderStock(json.data);
-    else renderSales(json.data);
+    else if(currentView === 'sales') renderSales(json.data);
+    else renderDiag(json.data);
   }catch(err){
     content.innerHTML = `<div class="state error">⚠ ${err.message}<br><br>
       Revisa que las variables de entorno ODOO_URL / ODOO_DB / ODOO_LOGIN / ODOO_PASSWORD
@@ -214,6 +217,24 @@ function renderSales(rows){
           </tr>`).join('')}
       </tbody>
     </table>
+  `;
+}
+
+function renderDiag(d){
+  const kpis = document.getElementById('kpis');
+  const content = document.getElementById('content');
+  kpis.innerHTML = '';
+  content.innerHTML = `
+    <div class="panel-title">Equipos de venta (crm.team)</div>
+    <pre style="white-space:pre-wrap; font-size:12px; color:var(--cream); background:var(--panel); padding:16px; border:1px solid var(--line);">${JSON.stringify(d.teams, null, 2)}</pre>
+    <div class="panel-title">Almacenes (stock.warehouse)</div>
+    <pre style="white-space:pre-wrap; font-size:12px; color:var(--cream); background:var(--panel); padding:16px; border:1px solid var(--line);">${JSON.stringify(d.warehouses, null, 2)}</pre>
+    <div class="panel-title">Puntos de venta (pos.config)</div>
+    <pre style="white-space:pre-wrap; font-size:12px; color:var(--cream); background:var(--panel); padding:16px; border:1px solid var(--line);">${JSON.stringify(d.posConfigs, null, 2)}</pre>
+    <div class="panel-title">Campos personalizados en pedidos (x_...)</div>
+    <pre style="white-space:pre-wrap; font-size:12px; color:var(--cream); background:var(--panel); padding:16px; border:1px solid var(--line);">${JSON.stringify(d.customFieldsOnOrders, null, 2)}</pre>
+    <div class="panel-title">Últimos 8 pedidos (muestra)</div>
+    <pre style="white-space:pre-wrap; font-size:12px; color:var(--cream); background:var(--panel); padding:16px; border:1px solid var(--line);">${JSON.stringify(d.sampleOrders, null, 2)}</pre>
   `;
 }
 
