@@ -83,15 +83,15 @@
     </div>
   </div>
   <div class="tabs">
-    <button class="tab active" data-view="stock">Stock</button>
-    <button class="tab" data-view="canales">Canales</button>
-    <button class="tab" data-view="productos">Top Productos</button>
+    <button class="tab active" data-view="canales">Canales</button>
     <button class="tab" data-view="b2b">Ranking B2B</button>
+    <button class="tab" data-view="productos">Top Productos</button>
+    <button class="tab" data-view="stock">Stock</button>
     <button class="tab" data-view="diag">Diagnóstico</button>
   </div>
 </header>
 
-<div class="filterbar" id="filterbar" style="display:none;">
+<div class="filterbar" id="filterbar" style="display:flex;">
   <button class="fbtn" data-preset="semana">Esta semana (Lun-Dom)</button>
   <button class="fbtn" data-preset="mes">Este mes</button>
   <button class="fbtn active" data-preset="mesvsmes">Mes vs mes anterior</button>
@@ -112,7 +112,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 const FN_URL = '/.netlify/functions/odoo-data';
-let currentView = 'stock';
+let currentView = 'canales';
 let salesCache = null;
 let oviedoSheetCache = null;
 let currentPreset = 'mesvsmes';
