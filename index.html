@@ -220,7 +220,13 @@ async function load(){
       renderStock(data);
     } else if(currentView === 'diag'){
       const data = await fetchType('diag');
-      renderDiag(data);
+      let oviedoRaw;
+      try {
+        const r = await fetch('/.netlify/functions/oviedo-sheet');
+        oviedoRaw = await r.json();
+        if(!r.ok) oviedoRaw = { httpStatus: r.status, ...oviedoRaw };
+      } catch(e) { oviedoRaw = { fetchError: e.message }; }
+      renderDiag({ ...data, oviedoRaw });
     } else {
       if(!salesCache) salesCache = await fetchType('sales');
       if(!oviedoSheetCache){
@@ -240,6 +246,8 @@ function renderDiag(d){
   kpis.innerHTML = '';
   const pre = (obj) => `<pre style="white-space:pre-wrap; font-size:12px; color:var(--cream); background:var(--panel); padding:16px; border:1px solid var(--line); font-family:'IBM Plex Sans',monospace;">${JSON.stringify(obj, null, 2)}</pre>`;
   content.innerHTML = `
+    <div class="panel-title">Hoja de Oviedo (respuesta cruda de la función)</div>
+    ${pre(d.oviedoRaw)}
     <div class="panel-title">Búsqueda de clientes con "online" en el nombre</div>
     ${pre(d.onlinePartnerSearch)}
     <div class="panel-title">Pedidos de esos clientes (si los hay)</div>
@@ -326,6 +334,9 @@ function findOviedoMonth(monthIndex){
   return oviedoSheetCache.find(m=>m.monthIndex===monthIndex) || null;
 }
 function oviedoChannelEntry(monthIndex, unavailableNote){
+  if(oviedoSheetCache && !Array.isArray(oviedoSheetCache) && oviedoSheetCache.error){
+    return { channel:'Tienda Oviedo', orders:null, revenue:0, cost:0, margin:0, marginPct:0, fromSheet:true, unavailable:true, note: `⚠ Error leyendo la hoja: ${oviedoSheetCache.error}` };
+  }
   const m = monthIndex!=null ? findOviedoMonth(monthIndex) : null;
   if(m){
     const hasEstimate = m.profitEstimateConMercaderia != null;
@@ -337,7 +348,7 @@ function oviedoChannelEntry(monthIndex, unavailableNote){
       fromSheet: true, estimated: hasEstimate, golvo: m.golvo,
     };
   }
-  return { channel:'Tienda Oviedo', orders:null, revenue:0, cost:0, margin:0, marginPct:0, fromSheet:true, unavailable:true, note: unavailableNote || 'Sin datos para este periodo en la hoja de Oviedo.' };
+  return { channel:'Tienda Oviedo', orders:null, revenue:0, cost:0, margin:0, marginPct:0, fromSheet:true, unavailable:true, note: unavailableNote || `Sin datos para ese mes en la hoja (la función devolvió ${Array.isArray(oviedoSheetCache)?oviedoSheetCache.length:0} meses en total — revisa la pestaña Diagnóstico).` };
 }
 function replaceOviedo(channelsArr, entry){
   const idx = channelsArr.findIndex(c=>c.channel==='Tienda Oviedo');
