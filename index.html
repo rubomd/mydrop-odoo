@@ -340,11 +340,12 @@ function oviedoChannelEntry(monthIndex, unavailableNote){
   const m = monthIndex!=null ? findOviedoMonth(monthIndex) : null;
   if(m){
     const hasEstimate = m.profitEstimateConMercaderia != null;
+    const revenueUntaxed = m.totalUntaxed != null ? m.totalUntaxed : m.total;
     return {
-      channel: 'Tienda Oviedo', orders: null, revenue: m.total,
-      cost: hasEstimate ? (m.total - m.profitEstimateConMercaderia) : 0,
-      margin: hasEstimate ? m.profitEstimateConMercaderia : m.total,
-      marginPct: hasEstimate && m.total ? (m.profitEstimateConMercaderia/m.total*100) : 0,
+      channel: 'Tienda Oviedo', orders: null, revenue: revenueUntaxed,
+      cost: hasEstimate ? (revenueUntaxed - m.profitEstimateConMercaderia) : 0,
+      margin: hasEstimate ? m.profitEstimateConMercaderia : revenueUntaxed,
+      marginPct: hasEstimate && revenueUntaxed ? (m.profitEstimateConMercaderia/revenueUntaxed*100) : 0,
       fromSheet: true, estimated: hasEstimate, golvo: m.golvo,
     };
   }
@@ -363,7 +364,7 @@ function renderCanales(){
   const { orders, lines } = salesCache;
   const note = document.getElementById('filterNote');
 
-  const onlineNote = `<div class="infobox">La <strong>Tienda Online</strong> se registra en Odoo a mano bajo el cliente <strong>CLIENTE WEB</strong> — ya está incluida en estos datos.<br>La <strong>Tienda Oviedo</strong> usa la hoja "Admin Mes - MD Oviedo" (Efectivo + Tarjeta + Glovo). Su margen es una <strong>estimación al 50% sobre ventas</strong> (tabla "con mercadería" de la propia hoja), no un cálculo real como en el resto de canales. Solo tiene datos mensuales, no diarios.</div>`;
+  const onlineNote = `<div class="infobox">Todas las cifras son <strong>sin IVA</strong> (base imponible). En Odoo se usa el importe sin impuestos de cada pedido. En Oviedo, el importe de caja (que sí incluye IVA) se destaxa al 21%.<br>La <strong>Tienda Online</strong> se registra en Odoo a mano bajo el cliente <strong>CLIENTE WEB</strong> — ya está incluida en estos datos.<br>La <strong>Tienda Oviedo</strong> usa la hoja "Admin Mes - MD Oviedo" (Efectivo + Tarjeta + Glovo). Su margen es una <strong>estimación al 50% sobre ventas</strong> (tabla "con mercadería" de la propia hoja). Solo tiene datos mensuales, no diarios.</div>`;
 
   if(currentPreset === 'mesvsmes'){
     const { curFrom, curTo, prevFrom, prevTo } = getMonthVsMonth();
