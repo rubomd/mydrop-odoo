@@ -187,6 +187,39 @@ async function getSalesData() {
   return { orders: ordersOut, lines: linesOut };
 }
 
+async function getBankBalances() {
+  const journals = await odooCall(
+    'account.journal',
+    'search_read',
+    [[['type', 'in', ['bank', 'cash']]]],
+    { fields: ['name', 'type', 'currency_id', 'default_account_id'], limit: 100 }
+  );
+
+  const accountIds = journals.filter(j => j.default_account_id).map(j => j.default_account_id[0]);
+  if (!accountIds.length) return [];
+
+  const groups = await odooCall(
+    'account.move.line',
+    'read_group',
+    [[['account_id', 'in', accountIds], ['parent_state', '=', 'posted']], ['balance:sum'], ['account_id']],
+    {}
+  );
+
+  const balanceByAccount = {};
+  groups.forEach(g => { if (g.account_id) balanceByAccount[g.account_id[0]] = g.balance || 0; });
+
+  return journals
+    .filter(j => j.default_account_id)
+    .map(j => ({
+      id: j.id,
+      name: j.name,
+      type: j.type,
+      currency: j.currency_id ? j.currency_id[1] : 'EUR',
+      account_name: j.default_account_id[1],
+      balance: balanceByAccount[j.default_account_id[0]] || 0,
+    }));
+}
+
 async function getDiagnostics() {
   const [teams, warehouses, posConfigs, orderFields, sampleOrders, partnerTags, onlinePartnerSearch, productCategories] = await Promise.all([
     odooCall('crm.team', 'search_read', [[]], { fields: ['id', 'name'] }).catch(e => ({ error: e.message })),
@@ -276,6 +309,7 @@ exports.handler = async (event) => {
     if (type === 'stock') data = await getStockData();
     else if (type === 'sales') data = await getSalesData();
     else if (type === 'diag') data = await getDiagnostics();
+    else if (type === 'bank') data = await getBankBalances();
     else {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'type debe ser "stock", "sales" o "diag"' }) };
     }
