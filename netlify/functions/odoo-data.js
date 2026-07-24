@@ -198,15 +198,19 @@ async function getBankBalances() {
   const accountIds = journals.filter(j => j.default_account_id).map(j => j.default_account_id[0]);
   if (!accountIds.length) return [];
 
-  const groups = await odooCall(
+  const moveLines = await odooCall(
     'account.move.line',
-    'read_group',
-    [[['account_id', 'in', accountIds], ['parent_state', '=', 'posted']], ['balance:sum'], ['account_id']],
-    {}
+    'search_read',
+    [[['account_id', 'in', accountIds], ['parent_state', '=', 'posted']]],
+    { fields: ['account_id', 'balance'], limit: 50000 }
   );
 
   const balanceByAccount = {};
-  groups.forEach(g => { if (g.account_id) balanceByAccount[g.account_id[0]] = g.balance || 0; });
+  moveLines.forEach(l => {
+    if (!l.account_id) return;
+    const accId = l.account_id[0];
+    balanceByAccount[accId] = (balanceByAccount[accId] || 0) + (l.balance || 0);
+  });
 
   return journals
     .filter(j => j.default_account_id)
