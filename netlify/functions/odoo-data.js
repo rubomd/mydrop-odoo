@@ -203,7 +203,7 @@ async function getPricingData() {
     'product.product',
     'search_read',
     [[['sale_ok', '=', true]]],
-    { fields: ['name', 'default_code', 'list_price', 'standard_price', 'product_tmpl_id'], limit: 3000 }
+    { fields: ['name', 'default_code', 'list_price', 'standard_price', 'product_tmpl_id', 'categ_id'], limit: 3000 }
   );
 
   // 3. Reglas de precio de la tarifa B2B (si existe)
@@ -267,6 +267,7 @@ async function getPricingData() {
     return {
       name: p.name,
       code: p.default_code || '',
+      category: p.categ_id ? p.categ_id[1] : 'Sin categoría',
       cost,
       web: margin(webPrice),
       b2b: { ...margin(b2bPrice), hasRule: b2bResult.hasRule },
