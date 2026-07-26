@@ -187,6 +187,96 @@ async function getSalesData() {
   return { orders: ordersOut, lines: linesOut };
 }
 
+// --- Tarifas: coste, precio B2B, precio Web y precio Avilés (B2B +5%) por producto ---
+async function getPricingData() {
+  // 1. Localizar la tarifa "B2B" en Odoo
+  const pricelists = await odooCall(
+    'product.pricelist',
+    'search_read',
+    [[['name', 'ilike', 'B2B']]],
+    { fields: ['id', 'name'] }
+  );
+  const b2bPricelist = pricelists[0] || null;
+
+  // 2. Todos los productos vendibles, con coste y precio de venta normal (= precio Web)
+  const products = await odooCall(
+    'product.product',
+    'search_read',
+    [[['sale_ok', '=', true]]],
+    { fields: ['name', 'default_code', 'list_price', 'standard_price', 'product_tmpl_id'], limit: 3000 }
+  );
+
+  // 3. Reglas de precio de la tarifa B2B (si existe)
+  let items = [];
+  if (b2bPricelist) {
+    items = await odooCall(
+      'product.pricelist.item',
+      'search_read',
+      [[['pricelist_id', '=', b2bPricelist.id]]],
+      {
+        fields: ['product_id', 'product_tmpl_id', 'applied_on', 'compute_price', 'fixed_price', 'percent_price', 'price_discount', 'price_surcharge', 'base'],
+        limit: 5000,
+      }
+    );
+  }
+
+  // Indexamos las reglas por variante (product_id) y por plantilla (product_tmpl_id),
+  // dando prioridad a la regla de variante si existe (aplied_on = '0_product_variant')
+  const itemByVariant = {};
+  const itemByTemplate = {};
+  items.forEach((it) => {
+    if (it.applied_on === '0_product_variant' && it.product_id) {
+      itemByVariant[it.product_id[0]] = it;
+    } else if (it.applied_on === '1_product' && it.product_tmpl_id) {
+      itemByTemplate[it.product_tmpl_id[0]] = it;
+    }
+  });
+
+  function computeB2BPrice(product) {
+    const item = itemByVariant[product.id] || (product.product_tmpl_id ? itemByTemplate[product.product_tmpl_id[0]] : null);
+    if (!item) {
+      return { price: product.list_price, hasRule: false };
+    }
+    const base = item.base === 'standard_price' ? product.standard_price : product.list_price;
+    let price;
+    if (item.compute_price === 'fixed') {
+      price = item.fixed_price;
+    } else if (item.compute_price === 'percentage') {
+      price = base * (1 - (item.percent_price || 0) / 100);
+    } else if (item.compute_price === 'formula') {
+      price = base * (1 - (item.price_discount || 0) / 100) + (item.price_surcharge || 0);
+    } else {
+      price = product.list_price;
+    }
+    return { price, hasRule: true };
+  }
+
+  const rows = products.map((p) => {
+    const cost = p.standard_price || 0;
+    const webPrice = p.list_price || 0;
+    const b2bResult = computeB2BPrice(p);
+    const b2bPrice = b2bResult.price || 0;
+    const avilesPrice = b2bPrice * 1.05;
+
+    const margin = (price) => ({
+      price,
+      marginAmount: price - cost,
+      marginPct: price ? ((price - cost) / price) * 100 : 0,
+    });
+
+    return {
+      name: p.name,
+      code: p.default_code || '',
+      cost,
+      web: margin(webPrice),
+      b2b: { ...margin(b2bPrice), hasRule: b2bResult.hasRule },
+      aviles: margin(avilesPrice),
+    };
+  });
+
+  return { pricelistFound: !!b2bPricelist, pricelistName: b2bPricelist ? b2bPricelist.name : null, rows };
+}
+
 async function getBankBalances() {
   const journals = await odooCall(
     'account.journal',
@@ -314,8 +404,9 @@ exports.handler = async (event) => {
     else if (type === 'sales') data = await getSalesData();
     else if (type === 'diag') data = await getDiagnostics();
     else if (type === 'bank') data = await getBankBalances();
+    else if (type === 'pricing') data = await getPricingData();
     else {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'type debe ser "stock", "sales" o "diag"' }) };
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'type debe ser "stock", "sales", "bank", "pricing" o "diag"' }) };
     }
 
     return { statusCode: 200, headers, body: JSON.stringify({ type, data }) };
