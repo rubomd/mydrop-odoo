@@ -76,6 +76,7 @@
     <button class="tab" data-view="productos">Top Productos</button>
     <button class="tab" data-view="stock">Stock</button>
     <button class="tab" data-view="bancos">Bancos</button>
+    <button class="tab" data-view="tarifas">Tarifas</button>
     <button class="tab" data-view="diag">Diagnóstico</button>
   </div>
 </header>
@@ -110,7 +111,7 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     currentView = btn.dataset.view;
-    document.getElementById('filterbar').style.display = (currentView==='stock' || currentView==='diag' || currentView==='bancos') ? 'none' : 'flex';
+    document.getElementById('filterbar').style.display = (currentView==='stock' || currentView==='diag' || currentView==='bancos' || currentView==='tarifas') ? 'none' : 'flex';
     load();
   });
 });
@@ -190,6 +191,9 @@ async function load(){
     } else if(currentView === 'bancos'){
       const data = await fetchType('bank');
       renderBank(data);
+    } else if(currentView === 'tarifas'){
+      const data = await fetchType('pricing');
+      renderTarifas(data);
     } else if(currentView === 'diag'){
       const data = await fetchType('diag');
       renderDiag(data);
@@ -254,6 +258,71 @@ function renderBank(rows){
         </div>
       `).join('')}
     </div>`;
+}
+
+// --- TARIFAS ---
+let tarifasCache = null;
+let tarifasSearch = '';
+
+function renderTarifas(data){
+  tarifasCache = data;
+  renderTarifasFiltered();
+}
+
+function renderTarifasFiltered(){
+  const kpis = document.getElementById('kpis');
+  const content = document.getElementById('content');
+  const data = tarifasCache;
+  const rows = data.rows || [];
+
+  const q = tarifasSearch.trim().toLowerCase();
+  const filtered = q ? rows.filter(r => (r.name||'').toLowerCase().includes(q) || (r.code||'').toLowerCase().includes(q)) : rows;
+
+  const avgMarginB2B = filtered.length ? filtered.reduce((s,r)=>s+r.b2b.marginPct,0)/filtered.length : 0;
+  const avgMarginWeb = filtered.length ? filtered.reduce((s,r)=>s+r.web.marginPct,0)/filtered.length : 0;
+  const avgMarginAviles = filtered.length ? filtered.reduce((s,r)=>s+r.aviles.marginPct,0)/filtered.length : 0;
+  const withoutB2BRule = filtered.filter(r=>!r.b2b.hasRule).length;
+
+  kpis.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Productos</div><div class="kpi-value">${filtered.length}</div></div>
+    <div class="kpi"><div class="kpi-label">Margen medio B2B</div><div class="kpi-value good">${fmtPct(avgMarginB2B)}</div></div>
+    <div class="kpi"><div class="kpi-label">Margen medio Web</div><div class="kpi-value good">${fmtPct(avgMarginWeb)}</div></div>
+    <div class="kpi"><div class="kpi-label">Margen medio Avilés</div><div class="kpi-value good">${fmtPct(avgMarginAviles)}</div></div>`;
+
+  const warning = !data.pricelistFound
+    ? `<div class="infobox" style="border-color:var(--coral); color:var(--coral);">⚠ No se ha encontrado ninguna tarifa de precios llamada "B2B" en Odoo. Los precios B2B mostrados son el precio Web (sin regla propia).</div>`
+    : `<div class="infobox">Precio B2B tomado de la tarifa <strong>"${data.pricelistName}"</strong> en Odoo. Avilés = Precio B2B + 5%. ${withoutB2BRule ? `<span style="color:var(--coral)">${withoutB2BRule} producto${withoutB2BRule===1?'':'s'} sin regla propia en la tarifa B2B (se muestra el precio Web como B2B).</span>` : ''}</div>`;
+
+  content.innerHTML = `
+    ${warning}
+    <div style="margin-bottom:20px;">
+      <input type="text" id="tarifasSearchInput" placeholder="Buscar producto o referencia…" value="${tarifasSearch.replace(/"/g,'&quot;')}"
+        style="width:100%; max-width:400px; background:var(--panel); color:var(--cream); border:1px solid var(--line); font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:10px 14px;">
+    </div>
+    <div class="panel-title">Tarifas por producto — Coste, B2B, Web y Avilés</div>
+    <table><thead><tr>
+      <th>Producto</th><th>Ref.</th><th>Coste</th>
+      <th>Precio B2B</th><th>Margen B2B</th><th>Margen B2B %</th>
+      <th>Precio Web</th><th>Margen Web</th><th>Margen Web %</th>
+      <th>Precio Avilés</th><th>Margen Avilés</th><th>Margen Avilés %</th>
+    </tr></thead>
+    <tbody>${filtered.map(r=>`<tr>
+      <td>${r.name}</td><td>${r.code||'—'}</td><td>${fmtEUR(r.cost)}</td>
+      <td>${fmtEUR(r.b2b.price)}${!r.b2b.hasRule?' <span class="badge muted">sin regla</span>':''}</td>
+      <td class="pos">${fmtEUR(r.b2b.marginAmount)}</td><td class="${r.b2b.marginPct<20?'neg':''}">${fmtPct(r.b2b.marginPct)}</td>
+      <td>${fmtEUR(r.web.price)}</td>
+      <td class="pos">${fmtEUR(r.web.marginAmount)}</td><td class="${r.web.marginPct<20?'neg':''}">${fmtPct(r.web.marginPct)}</td>
+      <td>${fmtEUR(r.aviles.price)}</td>
+      <td class="pos">${fmtEUR(r.aviles.marginAmount)}</td><td class="${r.aviles.marginPct<20?'neg':''}">${fmtPct(r.aviles.marginPct)}</td>
+    </tr>`).join('')}</tbody></table>`;
+
+  document.getElementById('tarifasSearchInput').addEventListener('input', e=>{
+    tarifasSearch = e.target.value;
+    renderTarifasFiltered();
+  });
+  document.getElementById('tarifasSearchInput').focus();
+  const inp = document.getElementById('tarifasSearchInput');
+  inp.setSelectionRange(inp.value.length, inp.value.length);
 }
 
 function renderCurrentTab(){
