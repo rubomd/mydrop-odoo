@@ -265,6 +265,8 @@ let tarifasCache = null;
 let tarifasSearch = '';
 let tarifasSubView = 'b2b';
 let tarifasCategory = 'todas';
+let tarifasViewMode = 'lista'; // 'lista' | 'categorias'
+let tarifasExpanded = new Set();
 
 function renderTarifas(data){
   tarifasCache = data;
@@ -303,33 +305,26 @@ function renderTarifasFiltered(){
 
   content.innerHTML = `
     ${warning}
-    <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin-bottom:20px;">
+    <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
       <div class="tabs" id="tarifasSubTabs">
         ${SUBS.map(s=>`<button class="tab ${s.key===tarifasSubView?'active':''}" data-sub="${s.key}">${s.label}</button>`).join('')}
       </div>
-      <select id="tarifasCategorySelect" style="background:var(--panel); color:var(--cream); border:1px solid var(--line); font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:8px 12px;">
-        <option value="todas" ${tarifasCategory==='todas'?'selected':''}>Todas las categorías</option>
-        ${categories.map(c=>`<option value="${c}" ${c===tarifasCategory?'selected':''}>${c}</option>`).join('')}
-      </select>
       <input type="text" id="tarifasSearchInput" placeholder="Buscar producto o referencia…" value="${tarifasSearch.replace(/"/g,'&quot;')}"
         style="flex:1; min-width:220px; max-width:400px; background:var(--panel); color:var(--cream); border:1px solid var(--line); font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:10px 14px;">
     </div>
-    <div class="panel-title">Tarifa ${SUBS.find(s=>s.key===tarifasSubView).label} — Coste, precio y margen por producto${tarifasCategory!=='todas'?` · ${tarifasCategory}`:''}</div>
-    <table><thead><tr>
-      <th>Producto</th><th>Categoría</th><th>Ref.</th><th>Coste</th><th>Precio</th><th>Margen</th><th>Margen %</th>
-    </tr></thead>
-    <tbody>${current.map(r=>`<tr>
-      <td>${r.name}</td><td>${r.category}</td><td>${r.code||'—'}</td><td>${fmtEUR(r.cost)}</td>
-      <td>${fmtEUR(r.price)}${tarifasSubView==='b2b' && !r.hasRule?' <span class="badge muted">sin regla</span>':''}</td>
-      <td class="pos">${fmtEUR(r.marginAmount)}</td><td class="${r.marginPct<20?'neg':''}">${fmtPct(r.marginPct)}</td>
-    </tr>`).join('')}</tbody></table>`;
+    <div style="display:flex; gap:8px; margin-bottom:20px;">
+      <button class="fbtn ${tarifasViewMode==='lista'?'active':''}" id="tarifasModoLista">Todos los productos</button>
+      <button class="fbtn ${tarifasViewMode==='categorias'?'active':''}" id="tarifasModoCategorias">Agrupado por categoría</button>
+      ${tarifasViewMode==='lista' ? `
+        <select id="tarifasCategorySelect" style="background:var(--panel); color:var(--cream); border:1px solid var(--line); font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:8px 12px;">
+          <option value="todas" ${tarifasCategory==='todas'?'selected':''}>Todas las categorías</option>
+          ${categories.map(c=>`<option value="${c}" ${c===tarifasCategory?'selected':''}>${c}</option>`).join('')}
+        </select>` : ''}
+    </div>
+    <div id="tarifasTableArea"></div>`;
 
   document.getElementById('tarifasSearchInput').addEventListener('input', e=>{
     tarifasSearch = e.target.value;
-    renderTarifasFiltered();
-  });
-  document.getElementById('tarifasCategorySelect').addEventListener('change', e=>{
-    tarifasCategory = e.target.value;
     renderTarifasFiltered();
   });
   document.querySelectorAll('#tarifasSubTabs .tab').forEach(btn=>{
@@ -338,6 +333,61 @@ function renderTarifasFiltered(){
       renderTarifasFiltered();
     });
   });
+  document.getElementById('tarifasModoLista').addEventListener('click', ()=>{ tarifasViewMode='lista'; renderTarifasFiltered(); });
+  document.getElementById('tarifasModoCategorias').addEventListener('click', ()=>{ tarifasViewMode='categorias'; renderTarifasFiltered(); });
+  const catSelect = document.getElementById('tarifasCategorySelect');
+  if(catSelect) catSelect.addEventListener('change', e=>{ tarifasCategory = e.target.value; renderTarifasFiltered(); });
+
+  const tableArea = document.getElementById('tarifasTableArea');
+  const subLabel = SUBS.find(s=>s.key===tarifasSubView).label;
+
+  const rowHtml = (r) => `<tr>
+      <td>${r.name}</td><td>${r.code||'—'}</td><td>${fmtEUR(r.cost)}</td>
+      <td>${fmtEUR(r.price)}${tarifasSubView==='b2b' && !r.hasRule?' <span class="badge muted">sin regla</span>':''}</td>
+      <td class="pos">${fmtEUR(r.marginAmount)}</td><td class="${r.marginPct<20?'neg':''}">${fmtPct(r.marginPct)}</td>
+    </tr>`;
+
+  if(tarifasViewMode === 'lista'){
+    const byCategory = tarifasCategory==='todas' ? current : current.filter(r=>r.category===tarifasCategory);
+    tableArea.innerHTML = `
+      <div class="panel-title">Tarifa ${subLabel} — Coste, precio y margen por producto${tarifasCategory!=='todas'?` · ${tarifasCategory}`:''}</div>
+      <table><thead><tr><th>Producto</th><th>Ref.</th><th>Coste</th><th>Precio</th><th>Margen</th><th>Margen %</th></tr></thead>
+      <tbody>${byCategory.map(rowHtml).join('')}</tbody></table>`;
+  } else {
+    // Agrupado por categoría: un botón por categoría que despliega/repliega su tabla
+    const grouped = {};
+    current.forEach(r=>{ (grouped[r.category] = grouped[r.category] || []).push(r); });
+    const catNames = Object.keys(grouped).sort();
+
+    tableArea.innerHTML = `
+      <div class="panel-title">Tarifa ${subLabel} — agrupado por categoría</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px;" id="tarifasCatButtons">
+        ${catNames.map(cat=>{
+          const items = grouped[cat];
+          const avgM = items.reduce((s,r)=>s+r.marginPct,0)/items.length;
+          const isOpen = tarifasExpanded.has(cat);
+          return `<button class="fbtn ${isOpen?'active':''}" data-cat="${cat.replace(/"/g,'&quot;')}">
+            ${cat} <span style="opacity:0.7">(${items.length} · ${fmtPct(avgM)})</span>
+          </button>`;
+        }).join('')}
+      </div>
+      ${catNames.filter(cat=>tarifasExpanded.has(cat)).map(cat=>`
+        <div class="panel-title" style="margin-top:24px;">${cat} (${grouped[cat].length})</div>
+        <table><thead><tr><th>Producto</th><th>Ref.</th><th>Coste</th><th>Precio</th><th>Margen</th><th>Margen %</th></tr></thead>
+        <tbody>${grouped[cat].map(rowHtml).join('')}</tbody></table>
+      `).join('') || `<div class="state">Haz clic en una categoría de arriba para ver sus productos.</div>`}
+    `;
+
+    document.querySelectorAll('#tarifasCatButtons .fbtn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const cat = btn.dataset.cat;
+        if(tarifasExpanded.has(cat)) tarifasExpanded.delete(cat);
+        else tarifasExpanded.add(cat);
+        renderTarifasFiltered();
+      });
+    });
+  }
+
   const inp = document.getElementById('tarifasSearchInput');
   inp.focus();
   inp.setSelectionRange(inp.value.length, inp.value.length);
