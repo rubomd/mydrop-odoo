@@ -264,6 +264,7 @@ function renderBank(rows){
 let tarifasCache = null;
 let tarifasSearch = '';
 let tarifasSubView = 'b2b';
+let tarifasCategory = 'todas';
 
 function renderTarifas(data){
   tarifasCache = data;
@@ -275,9 +276,11 @@ function renderTarifasFiltered(){
   const content = document.getElementById('content');
   const data = tarifasCache;
   const rows = data.rows || [];
+  const categories = [...new Set(rows.map(r=>r.category))].sort();
 
   const q = tarifasSearch.trim().toLowerCase();
-  const filtered = q ? rows.filter(r => (r.name||'').toLowerCase().includes(q) || (r.code||'').toLowerCase().includes(q)) : rows;
+  const byCategory = tarifasCategory==='todas' ? rows : rows.filter(r=>r.category===tarifasCategory);
+  const filtered = q ? byCategory.filter(r => (r.name||'').toLowerCase().includes(q) || (r.code||'').toLowerCase().includes(q)) : byCategory;
 
   const SUBS = [
     { key:'b2b', label:'B2B' },
@@ -285,7 +288,7 @@ function renderTarifasFiltered(){
     { key:'aviles', label:'Avilés' },
   ];
 
-  const current = filtered.map(r => ({ name:r.name, code:r.code, cost:r.cost, ...r[tarifasSubView] }));
+  const current = filtered.map(r => ({ name:r.name, code:r.code, category:r.category, cost:r.cost, ...r[tarifasSubView] }));
   const avgMargin = current.length ? current.reduce((s,r)=>s+r.marginPct,0)/current.length : 0;
   const withoutRule = tarifasSubView==='b2b' ? current.filter(r=>!r.hasRule).length : 0;
 
@@ -304,21 +307,29 @@ function renderTarifasFiltered(){
       <div class="tabs" id="tarifasSubTabs">
         ${SUBS.map(s=>`<button class="tab ${s.key===tarifasSubView?'active':''}" data-sub="${s.key}">${s.label}</button>`).join('')}
       </div>
+      <select id="tarifasCategorySelect" style="background:var(--panel); color:var(--cream); border:1px solid var(--line); font-family:'IBM Plex Sans',sans-serif; font-size:12px; padding:8px 12px;">
+        <option value="todas" ${tarifasCategory==='todas'?'selected':''}>Todas las categorías</option>
+        ${categories.map(c=>`<option value="${c}" ${c===tarifasCategory?'selected':''}>${c}</option>`).join('')}
+      </select>
       <input type="text" id="tarifasSearchInput" placeholder="Buscar producto o referencia…" value="${tarifasSearch.replace(/"/g,'&quot;')}"
         style="flex:1; min-width:220px; max-width:400px; background:var(--panel); color:var(--cream); border:1px solid var(--line); font-family:'IBM Plex Sans',sans-serif; font-size:13px; padding:10px 14px;">
     </div>
-    <div class="panel-title">Tarifa ${SUBS.find(s=>s.key===tarifasSubView).label} — Coste, precio y margen por producto</div>
+    <div class="panel-title">Tarifa ${SUBS.find(s=>s.key===tarifasSubView).label} — Coste, precio y margen por producto${tarifasCategory!=='todas'?` · ${tarifasCategory}`:''}</div>
     <table><thead><tr>
-      <th>Producto</th><th>Ref.</th><th>Coste</th><th>Precio</th><th>Margen</th><th>Margen %</th>
+      <th>Producto</th><th>Categoría</th><th>Ref.</th><th>Coste</th><th>Precio</th><th>Margen</th><th>Margen %</th>
     </tr></thead>
     <tbody>${current.map(r=>`<tr>
-      <td>${r.name}</td><td>${r.code||'—'}</td><td>${fmtEUR(r.cost)}</td>
+      <td>${r.name}</td><td>${r.category}</td><td>${r.code||'—'}</td><td>${fmtEUR(r.cost)}</td>
       <td>${fmtEUR(r.price)}${tarifasSubView==='b2b' && !r.hasRule?' <span class="badge muted">sin regla</span>':''}</td>
       <td class="pos">${fmtEUR(r.marginAmount)}</td><td class="${r.marginPct<20?'neg':''}">${fmtPct(r.marginPct)}</td>
     </tr>`).join('')}</tbody></table>`;
 
   document.getElementById('tarifasSearchInput').addEventListener('input', e=>{
     tarifasSearch = e.target.value;
+    renderTarifasFiltered();
+  });
+  document.getElementById('tarifasCategorySelect').addEventListener('change', e=>{
+    tarifasCategory = e.target.value;
     renderTarifasFiltered();
   });
   document.querySelectorAll('#tarifasSubTabs .tab').forEach(btn=>{
