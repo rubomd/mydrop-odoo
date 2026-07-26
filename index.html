@@ -102,6 +102,7 @@
 const FN_URL = '/.netlify/functions/odoo-data';
 let currentView = 'canales';
 let salesCache = null;
+let oviedoSheetCache = null;
 let currentPreset = 'mesvsmes';
 
 document.querySelectorAll('.tab').forEach(btn=>{
@@ -170,6 +171,13 @@ async function fetchType(type){
   return json.data;
 }
 
+async function fetchOviedoSheet(){
+  const res = await fetch('/.netlify/functions/oviedo-sheet');
+  const json = await res.json();
+  if(!res.ok) throw new Error('Hoja de Oviedo: ' + (json.error || 'error desconocido'));
+  return json.data;
+}
+
 async function load(){
   const content = document.getElementById('content');
   const kpis = document.getElementById('kpis');
@@ -187,6 +195,10 @@ async function load(){
       renderDiag(data);
     } else {
       if(!salesCache) salesCache = await fetchType('sales');
+      if(!oviedoSheetCache){
+        try { oviedoSheetCache = await fetchOviedoSheet(); }
+        catch(e) { oviedoSheetCache = { error: e.message }; }
+      }
       renderCurrentTab();
     }
   }catch(err){
@@ -342,19 +354,50 @@ function computeChannelTotals(orders, lines, from, to){
   return Object.values(agg).map(c=>({...c, margin:c.revenue-c.cost, marginPct: c.revenue? (c.revenue-c.cost)/c.revenue*100:0}));
 }
 
+function findOviedoMonth(monthIndex){
+  if(!Array.isArray(oviedoSheetCache)) return null;
+  return oviedoSheetCache.find(m=>m.monthIndex===monthIndex) || null;
+}
+function oviedoChannelEntry(from, to){
+  if(oviedoSheetCache && !Array.isArray(oviedoSheetCache) && oviedoSheetCache.error){
+    return { channel:'Tienda Oviedo', orders:null, revenue:0, cost:0, margin:0, marginPct:0, fromSheet:true, unavailable:true, note: `⚠ Error leyendo la hoja: ${oviedoSheetCache.error}` };
+  }
+  const sameMonth = from.getMonth()===to.getMonth() || (to - from) < 32*24*60*60*1000;
+  const monthIndex = sameMonth ? from.getMonth() : null;
+  const m = monthIndex!=null ? findOviedoMonth(monthIndex) : null;
+  if(m){
+    const hasEstimate = m.profitEstimateConMercaderia != null;
+    const revenueUntaxed = m.totalUntaxed != null ? m.totalUntaxed : m.total;
+    return {
+      channel: 'Tienda Oviedo', orders: null, revenue: revenueUntaxed,
+      cost: hasEstimate ? (revenueUntaxed - m.profitEstimateConMercaderia) : 0,
+      margin: hasEstimate ? m.profitEstimateConMercaderia : revenueUntaxed,
+      marginPct: hasEstimate && revenueUntaxed ? (m.profitEstimateConMercaderia/revenueUntaxed*100) : 0,
+      fromSheet: true, estimated: hasEstimate,
+    };
+  }
+  return { channel:'Tienda Oviedo', orders:null, revenue:0, cost:0, margin:0, marginPct:0, fromSheet:true, unavailable:true, note:'La hoja de Oviedo solo tiene datos mensuales — usa "Este mes" o "Mes vs mes anterior" para verlo.' };
+}
+function replaceOviedo(channelsArr, entry){
+  const idx = channelsArr.findIndex(c=>c.channel==='Tienda Oviedo');
+  if(idx!==-1) channelsArr.splice(idx,1);
+  channelsArr.push(entry);
+  return channelsArr;
+}
+
 function renderCanales(){
   const kpis = document.getElementById('kpis');
   const content = document.getElementById('content');
   const { orders, lines } = salesCache;
   const note = document.getElementById('filterNote');
 
-  const onlineNote = `<div class="infobox">Todas las cifras son <strong>sin IVA</strong> (base imponible). La <strong>Tienda Online</strong> se registra en Odoo a mano bajo el cliente <strong>CLIENTE WEB</strong> — ya está incluida en estos datos.</div>`;
+  const onlineNote = `<div class="infobox">Todas las cifras son <strong>sin IVA</strong> (base imponible). La <strong>Tienda Online</strong> se registra en Odoo a mano bajo el cliente <strong>CLIENTE WEB</strong> — ya está incluida en estos datos.<br>La <strong>Tienda Oviedo</strong> usa la hoja "Admin Mes - MD Oviedo" — el margen sale de la columna "CON MERCADERIA" y solo está disponible por mes completo (usa "Este mes" o "Mes vs mes anterior").</div>`;
 
   if(currentPreset === 'mesvsmes'){
     const { curFrom, curTo, prevFrom, prevTo } = getMonthVsMonth();
     note.textContent = `${curFrom.toLocaleDateString('es-ES',{month:'long',year:'numeric'})} vs ${prevFrom.toLocaleDateString('es-ES',{month:'long',year:'numeric'})}`;
-    const cur = computeChannelTotals(orders, lines, curFrom, curTo);
-    const prev = computeChannelTotals(orders, lines, prevFrom, prevTo);
+    const cur = replaceOviedo(computeChannelTotals(orders, lines, curFrom, curTo), oviedoChannelEntry(curFrom, curTo));
+    const prev = replaceOviedo(computeChannelTotals(orders, lines, prevFrom, prevTo), oviedoChannelEntry(prevFrom, prevTo));
     const prevByChannel = {}; prev.forEach(p=>{ prevByChannel[p.channel]=p; });
     const allChannels = gijonLast([...new Set([...cur.map(c=>c.channel), ...prev.map(c=>c.channel)])]);
 
@@ -375,16 +418,22 @@ function renderCanales(){
         const c = cur.find(x=>x.channel===ch) || {revenue:0,margin:0,marginPct:0};
         const p = prevByChannel[ch] || {revenue:0,margin:0};
         const pct = p.revenue? ((c.revenue-p.revenue)/p.revenue*100) : (c.revenue>0?100:0);
-        return `<tr><td>${ch}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(p.revenue)}</td>
-          <td><span class="${pct>=0?'up':'down'}">${pct>=0?'▲':'▼'} ${fmtPct(Math.abs(pct))}</span></td>
-          <td class="pos">${fmtEUR(c.margin)}</td><td>${fmtPct(c.marginPct)}</td></tr>`;
+        if(c.unavailable && p.unavailable){
+          return `<tr><td>${ch}</td><td colspan="5" style="color:var(--muted);">${c.note}</td></tr>`;
+        }
+        const curLabel = c.unavailable ? `<span class="badge muted" title="${c.note}">sin datos aún</span>` : fmtEUR(c.revenue);
+        const prevLabel = p.unavailable ? `<span class="badge muted" title="${p.note}">sin datos</span>` : fmtEUR(p.revenue);
+        const pctLabel = (c.unavailable || p.unavailable) ? '—' : `<span class="${pct>=0?'up':'down'}">${pct>=0?'▲':'▼'} ${fmtPct(Math.abs(pct))}</span>`;
+        return `<tr><td>${ch}${c.estimated?' <span class="badge muted">margen est.</span>':''}</td><td>${curLabel}</td><td>${prevLabel}</td>
+          <td>${pctLabel}</td>
+          <td class="pos">${c.unavailable?'—':fmtEUR(c.margin)}</td><td>${c.unavailable?'—':fmtPct(c.marginPct)}</td></tr>`;
       }).join('')}</tbody></table>`;
     return;
   }
 
   const range = getRange(currentPreset);
   note.textContent = range.label;
-  const totals = computeChannelTotals(orders, lines, range.from, range.to);
+  const totals = replaceOviedo(computeChannelTotals(orders, lines, range.from, range.to), oviedoChannelEntry(range.from, range.to));
   const totalRevenue = totals.reduce((s,c)=>s+c.revenue,0);
   const totalMargin = totals.reduce((s,c)=>s+c.margin,0);
   const totalOrders = totals.reduce((s,c)=>s+(c.orders||0),0);
@@ -399,9 +448,14 @@ function renderCanales(){
   content.innerHTML = onlineNote + `
     <div class="panel-title">Ventas por canal — ${range.label}</div>
     <table><thead><tr><th>Canal</th><th>Pedidos</th><th>Facturación</th><th>Coste</th><th>Margen</th><th>Margen %</th></tr></thead>
-    <tbody>${sortedTotals.map(c=>`<tr>
-      <td>${c.channel}</td><td>${c.orders!=null?c.orders:'—'}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(c.cost)}</td>
-      <td class="pos">${fmtEUR(c.margin)}</td><td>${fmtPct(c.marginPct)}</td></tr>`).join('')}</tbody></table>`;
+    <tbody>${sortedTotals.map(c=>{
+      if(c.unavailable){
+        return `<tr><td>${c.channel}</td><td colspan="5" style="color:var(--muted);">${c.note}</td></tr>`;
+      }
+      return `<tr>
+      <td>${c.channel}${c.estimated?' <span class="badge muted">margen est.</span>':''}</td><td>${c.orders!=null?c.orders:'—'}</td><td>${fmtEUR(c.revenue)}</td><td>${fmtEUR(c.cost)}</td>
+      <td class="pos">${fmtEUR(c.margin)}</td><td>${fmtPct(c.marginPct)}</td></tr>`;
+    }).join('')}</tbody></table>`;
 }
 
 // --- TOP PRODUCTOS ---
